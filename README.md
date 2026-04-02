@@ -18,4 +18,3 @@ View your app in AI Studio: https://ai.studio/apps/d50103cc-fda7-4305-ab2f-70231
 2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
 3. Run the app:
    `npm run dev`
-"# Carmerica" 
