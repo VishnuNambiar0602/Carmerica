@@ -4,6 +4,8 @@
 
 # Run and deploy your AI Studio app
 
+This is the working directory for the Americano Car Dealership website.
+
 This contains everything you need to run your app locally.
 
 View your app in AI Studio: https://ai.studio/apps/d50103cc-fda7-4305-ab2f-702314734642
