@@ -2,7 +2,7 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { CustomerLayout } from './components/layout/CustomerLayout';
 import { VendorLayout } from './components/layout/VendorLayout';
-import { AdminLayout } from './components/layout/AdminLayout';
+// import { AdminLayout } from './components/layout/AdminLayout';
 
 import AIGenie from './components/ai/AIGenie';
 import SmartGarage from './pages/customer/SmartGarage';
@@ -25,21 +25,7 @@ import VendorEarnings from './pages/vendor/VendorEarnings';
 import VendorPromotions from './pages/vendor/VendorPromotions';
 import VendorMessages from './pages/vendor/VendorMessages';
 import VendorReports from './pages/vendor/VendorReports';
-import AdminOverview from './pages/admin/AdminOverview';
-import AdminLogin from './pages/admin/AdminLogin';
-import AdminUsers from './pages/admin/AdminUsers';
-import AdminVendors from './pages/admin/AdminVendors';
-import AdminBookings from './pages/admin/AdminBookings';
-import AdminCategories from './pages/admin/AdminCategories';
-import AdminPricing from './pages/admin/AdminPricing';
-import AdminPromotions from './pages/admin/AdminPromotions';
-import AdminCMS from './pages/admin/AdminCMS';
-import AdminReviews from './pages/admin/AdminReviews';
-import AdminSupport from './pages/admin/AdminSupport';
-import AdminPayments from './pages/admin/AdminPayments';
-import AdminAnalytics from './pages/admin/AdminAnalytics';
-import AdminSettings from './pages/admin/AdminSettings';
-import AdminVendorKYV from './pages/admin/AdminVendorKYV';
+// Admin imports removed
 
 // Placeholder Components
 const Placeholder = ({ title }: { title: string }) => (
@@ -98,25 +84,7 @@ function App() {
           <Route path="reports" element={<VendorReports />} />
         </Route>
 
-        {/* Admin Routes */}
-        <Route path="/admin/login" element={<AdminLogin />} />
-        <Route path="/admin" element={<AdminLayout />}>
-          <Route index element={<Navigate to="/admin/overview" replace />} />
-          <Route path="overview" element={<AdminOverview />} />
-          <Route path="users" element={<AdminUsers />} />
-          <Route path="vendors" element={<AdminVendors />} />
-          <Route path="vendors/:id/kyv" element={<AdminVendorKYV />} />
-          <Route path="bookings" element={<AdminBookings />} />
-          <Route path="categories" element={<AdminCategories />} />
-          <Route path="pricing" element={<AdminPricing />} />
-          <Route path="promotions" element={<AdminPromotions />} />
-          <Route path="cms" element={<AdminCMS />} />
-          <Route path="reviews" element={<AdminReviews />} />
-          <Route path="support" element={<AdminSupport />} />
-          <Route path="payments" element={<AdminPayments />} />
-          <Route path="analytics" element={<AdminAnalytics />} />
-          <Route path="settings" element={<AdminSettings />} />
-        </Route>
+        {/* Admin routes removed */}
 
         {/* Fallback */}
         <Route path="*" element={<Navigate to="/" replace />} />
