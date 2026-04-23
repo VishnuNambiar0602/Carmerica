@@ -29,7 +29,7 @@ import { cn } from '../../lib/utils';
 const AdminOverview = () => {
   const stats = [
     { name: "Total Bookings", value: "1,240", icon: ClipboardList, color: "text-blue-600", bg: "bg-blue-50", trend: "+15%" },
-    { name: "Platform GMV", value: "AED 142,500", icon: DollarSign, color: "text-green-600", bg: "bg-green-50", trend: "+22%" },
+    { name: "Platform GMV", value: "$142,500", icon: DollarSign, color: "text-green-600", bg: "bg-green-50", trend: "+22%" },
     { name: "Active Vendors", value: "85", icon: Store, color: "text-purple-600", bg: "bg-purple-50", trend: "+5%" },
     { name: "Active Users", value: "4,250", icon: Users, color: "text-orange-600", bg: "bg-orange-50", trend: "+10%" },
   ];
@@ -261,7 +261,7 @@ const AdminOverview = () => {
                   <span className="text-[10px] font-bold text-red-600">High Risk</span>
                 </div>
                 <p className="text-xs text-red-700 leading-relaxed">
-                  Elite Motors requested a payout of AED 12,500 with 4 duplicate transaction IDs.
+                  Elite Motors requested a payout of $12,500 with 4 duplicate transaction IDs.
                 </p>
               </div>
               <div className="p-4 bg-yellow-50 rounded-2xl border border-yellow-100">

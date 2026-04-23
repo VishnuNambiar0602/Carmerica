@@ -219,7 +219,7 @@ const SmartGarage = () => {
                               <p className="text-xs text-green-600 font-bold">100% Compatible</p>
                             </div>
                           </div>
-                          <span className="text-sm font-bold text-red-600 group-hover:translate-x-1 transition-transform">AED 245 →</span>
+                          <span className="text-sm font-bold text-red-600 group-hover:translate-x-1 transition-transform">$245 →</span>
                         </div>
                         <div className="p-4 bg-gray-50 rounded-2xl border border-gray-100 flex items-center justify-between hover:bg-white hover:shadow-md transition-all cursor-pointer group">
                           <div className="flex items-center">
@@ -231,7 +231,7 @@ const SmartGarage = () => {
                               <p className="text-xs text-blue-600 font-bold">Performance Upgrade</p>
                             </div>
                           </div>
-                          <span className="text-sm font-bold text-red-600 group-hover:translate-x-1 transition-transform">AED 480 →</span>
+                          <span className="text-sm font-bold text-red-600 group-hover:translate-x-1 transition-transform">$480 →</span>
                         </div>
                       </div>
 
@@ -272,8 +272,8 @@ const SmartGarage = () => {
                 </ul>
                 <div className="mt-6 flex items-center justify-between">
                   <div>
-                    <p className="text-xs text-gray-400 line-through">AED 450</p>
-                    <p className="text-xl font-bold text-gray-900">AED 385</p>
+                    <p className="text-xs text-gray-400 line-through">$450</p>
+                    <p className="text-xl font-bold text-gray-900">$385</p>
                   </div>
                   <button className="bg-red-600 text-white px-4 py-2 rounded-xl text-sm font-bold hover:bg-red-700">Add Bundle</button>
                 </div>
@@ -289,8 +289,8 @@ const SmartGarage = () => {
                 </ul>
                 <div className="mt-6 flex items-center justify-between">
                   <div>
-                    <p className="text-xs text-gray-400 line-through">AED 620</p>
-                    <p className="text-xl font-bold text-gray-900">AED 540</p>
+                    <p className="text-xs text-gray-400 line-through">$620</p>
+                    <p className="text-xl font-bold text-gray-900">$540</p>
                   </div>
                   <button className="bg-white border border-gray-200 text-gray-700 px-4 py-2 rounded-xl text-sm font-bold hover:bg-gray-50">Add Bundle</button>
                 </div>

@@ -70,7 +70,7 @@ const Home = () => {
               </form>
               <div className="mt-4 flex flex-wrap gap-3">
                 <span className="text-white/60 text-xs font-bold uppercase tracking-wider">Try searching:</span>
-                <button onClick={() => navigate('/search')} className="text-white/90 text-xs font-medium hover:text-[#feba02] underline decoration-[#feba02]/30 underline-offset-4 transition-all">“SUV service under 500 AED”</button>
+                <button onClick={() => navigate('/search')} className="text-white/90 text-xs font-medium hover:text-[#feba02] underline decoration-[#feba02]/30 underline-offset-4 transition-all">“SUV service under $500”</button>
                 <button onClick={() => navigate('/search')} className="text-white/90 text-xs font-medium hover:text-[#feba02] underline decoration-[#feba02]/30 underline-offset-4 transition-all">“Best brake repair near Dubai”</button>
               </div>
             </div>
@@ -136,7 +136,7 @@ const Home = () => {
                   <div className="flex justify-between items-center pt-4 border-t border-gray-50">
                     <div className="flex flex-col">
                       <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Starts from</span>
-                      <span className="font-bold text-xl text-gray-900">AED {item.price}</span>
+                      <span className="font-bold text-xl text-gray-900">${item.price}</span>
                     </div>
                     <button className="bg-gray-900 text-white p-2 rounded-xl group-hover:bg-red-600 transition-colors">
                       <ChevronRight className="h-5 w-5" />
