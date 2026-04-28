@@ -2,7 +2,6 @@ import React from 'react';
 import { Search, MapPin, Calendar, Car, Shield, Star, Clock, ChevronRight, Sparkles, Zap, TrendingUp, ShieldCheck } from 'lucide-react';
 import { useNavigate, Link } from 'react-router-dom';
 import { cn } from '../../lib/utils';
-import AIGenie from '../../components/ai/AIGenie';
 
 const Home = () => {
   const navigate = useNavigate();
@@ -76,9 +75,8 @@ const Home = () => {
             </div>
           </div>
 
-          {/* AI Genie Inline */}
+          {/* AI Genie Inline Placeholder - Removed as per user request for separate floating button */}
           <div className="hidden lg:block">
-            <AIGenie inline className="max-w-md ml-auto" />
           </div>
         </div>
       </section>

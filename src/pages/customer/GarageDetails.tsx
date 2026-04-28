@@ -24,13 +24,11 @@ import {
 } from 'lucide-react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import { cn } from '../../lib/utils';
-import AIGenie from '../../components/ai/AIGenie';
 
 const GarageDetails = () => {
   const navigate = useNavigate();
   const { id } = useParams();
   const [selectedService, setSelectedService] = React.useState<number | null>(null);
-  const [showAIGenie, setShowAIGenie] = React.useState(false);
 
   const garage = {
     id: 1,
@@ -439,16 +437,6 @@ const GarageDetails = () => {
                 </div>
                 <div className="h-2 w-2 bg-green-500 rounded-full animate-pulse" />
               </button>
-              <button 
-                onClick={() => setShowAIGenie(true)}
-                className="w-full flex items-center justify-between p-4 bg-red-600 rounded-2xl hover:bg-red-700 transition-all text-white shadow-lg shadow-red-600/20"
-              >
-                <div className="flex items-center">
-                  <Sparkles className="h-5 w-5 mr-4 fill-current text-yellow-400" />
-                  <span className="text-sm font-bold">Ask AI Genie</span>
-                </div>
-                <ChevronRight className="h-4 w-4" />
-              </button>
             </div>
           </div>
 
@@ -480,20 +468,6 @@ const GarageDetails = () => {
         </div>
       </div>
 
-      {/* AI Genie Modal */}
-      {showAIGenie && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="bg-white w-full max-w-2xl rounded-[2.5rem] shadow-2xl overflow-hidden relative">
-            <button 
-              onClick={() => setShowAIGenie(false)}
-              className="absolute top-6 right-6 p-2 text-gray-400 hover:text-gray-900 z-10"
-            >
-              <Zap className="h-6 w-6 rotate-45" />
-            </button>
-            <AIGenie inline className="h-[600px]" />
-          </div>
-        </div>
-      )}
     </div>
   );
 };

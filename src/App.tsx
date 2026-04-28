@@ -4,7 +4,7 @@ import { CustomerLayout } from './components/layout/CustomerLayout';
 import { VendorLayout } from './components/layout/VendorLayout';
 import { AdminLayout } from './components/layout/AdminLayout';
 
-import AIGenie from './components/ai/AIGenie';
+import ChatWidget from './components/ChatWidget';
 import SmartGarage from './pages/customer/SmartGarage';
 import Home from './pages/customer/Home';
 import SearchResults from './pages/customer/SearchResults';
@@ -122,7 +122,7 @@ function App() {
         {/* Fallback */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
-      <AIGenie />
+      <ChatWidget />
     </Router>
   );
 }

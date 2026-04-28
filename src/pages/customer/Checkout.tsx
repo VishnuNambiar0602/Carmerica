@@ -21,12 +21,10 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '../../lib/utils';
-import AIGenie from '../../components/ai/AIGenie';
 
 const Checkout = () => {
   const navigate = useNavigate();
   const [step, setStep] = React.useState(1);
-  const [isAIGenieOpen, setIsAIGenieOpen] = React.useState(false);
   const [showBundles, setShowBundles] = React.useState(true);
 
   const steps = [
@@ -37,34 +35,6 @@ const Checkout = () => {
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-12">
-      {/* AI Genie Floating Button */}
-      <button 
-        onClick={() => setIsAIGenieOpen(true)}
-        className="fixed bottom-8 right-8 z-50 bg-red-600 text-white p-4 rounded-full shadow-2xl shadow-red-600/40 hover:scale-110 transition-all active:scale-95 group"
-      >
-        <Sparkles className="h-6 w-6 group-hover:rotate-12 transition-transform" />
-        <span className="absolute right-full mr-4 top-1/2 -translate-y-1/2 bg-gray-900 text-white px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-          Need help with your booking?
-        </span>
-      </button>
-
-      {/* AI Genie Modal */}
-      {isAIGenieOpen && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-sm">
-          <div className="bg-white w-full max-w-2xl rounded-[2.5rem] shadow-2xl overflow-hidden relative">
-            <button 
-              onClick={() => setIsAIGenieOpen(false)}
-              className="absolute top-6 right-6 z-10 p-2 hover:bg-gray-100 rounded-full transition-colors"
-            >
-              <Plus className="h-6 w-6 text-gray-400 rotate-45" />
-            </button>
-            <div className="p-8">
-              <AIGenie />
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Progress Bar */}
       <div className="flex items-center justify-center mb-16">
         {steps.map((s, i) => (
