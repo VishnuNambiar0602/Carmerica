@@ -1,4 +1,5 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { 
   ClipboardList, 
   DollarSign, 
@@ -27,14 +28,36 @@ import {
 import { cn } from '../../lib/utils';
 
 const VendorDashboard = () => {
+  const navigate = useNavigate();
   const stats = [
-    { name: "Today's Bookings", value: "12", icon: ClipboardList, color: "text-blue-600", bg: "bg-blue-50" },
-    { name: "Monthly Revenue", value: "AED 52,250", icon: DollarSign, color: "text-green-600", bg: "bg-green-50" },
-    { name: "Average Rating", value: "4.8", icon: Star, color: "text-yellow-600", bg: "bg-yellow-50" },
-    { name: "Pending Jobs", value: "5", icon: AlertCircle, color: "text-red-600", bg: "bg-red-50" },
+    { name: "Today's Bookings", value: "0", icon: ClipboardList, color: "text-blue-600", bg: "bg-blue-50" },
+    { name: "Monthly Revenue", value: "AED 0", icon: DollarSign, color: "text-green-600", bg: "bg-green-50" },
+    { name: "Average Rating", value: "0", icon: Star, color: "text-yellow-600", bg: "bg-yellow-50" },
+    { name: "Pending Jobs", value: "0", icon: AlertCircle, color: "text-red-600", bg: "bg-red-50" },
   ];
 
-  const recentBookings = [
+  const [statsData, setStatsData] = React.useState<any>(null);
+  const [recentBookingsData, setRecentBookingsData] = React.useState<any[]>([]);
+
+  React.useEffect(() => {
+    const load = async () => {
+      try {
+        // assume vendorId stored or default
+        const vendorId = localStorage.getItem('vendorId') || 'vendor-1';
+        const res = await fetch(`/api/vendor/stats?vendorId=${encodeURIComponent(vendorId)}`);
+        const data = await res.json();
+        setStatsData(data);
+        if (data) {
+          setRecentBookingsData(data.recentBookings || []);
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    };
+    load();
+  }, []);
+
+  const defaultRecentBookings = [
     { id: "BK-1029", customer: "John Doe", car: "Toyota Camry", service: "Oil Change", time: "10:00 AM", status: "In Progress" },
     { id: "BK-1030", customer: "Sarah Smith", car: "Honda Civic", service: "Brake Repair", time: "11:30 AM", status: "Pending" },
     { id: "BK-1031", customer: "Mike Johnson", car: "Ford F-150", service: "General Service", time: "01:00 PM", status: "Confirmed" },
@@ -45,7 +68,7 @@ const VendorDashboard = () => {
     <div className="space-y-8">
       {/* AI Smart Alert for Vendor */}
       <div className="bg-red-600 rounded-3xl p-6 text-white shadow-xl shadow-red-600/20 flex flex-col md:flex-row items-center justify-between gap-6 relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-64 h-full bg-gradient-to-l from-white/10 to-transparent pointer-events-none" />
+        <div className="absolute top-0 right-0 w-64 h-full bg-linear-to-l from-white/10 to-transparent pointer-events-none" />
         <div className="flex items-center space-x-4 relative z-10">
           <div className="bg-white/20 p-3 rounded-2xl backdrop-blur-md">
             <Sparkles className="h-6 w-6 text-yellow-400 fill-current" />
@@ -56,10 +79,10 @@ const VendorDashboard = () => {
           </div>
         </div>
         <div className="flex items-center space-x-4 relative z-10">
-          <button className="bg-white text-red-600 px-6 py-3 rounded-xl font-bold text-sm hover:bg-gray-100 transition-all active:scale-95">
+          <button onClick={() => navigate('/vendor/staff')} className="bg-white text-red-600 px-6 py-3 rounded-xl font-bold text-sm hover:bg-gray-100 transition-all active:scale-95">
             Optimize Staffing
           </button>
-          <button className="bg-red-700 text-white px-6 py-3 rounded-xl font-bold text-sm hover:bg-red-800 transition-all active:scale-95">
+          <button onClick={() => navigate('/vendor/promotions')} className="bg-red-700 text-white px-6 py-3 rounded-xl font-bold text-sm hover:bg-red-800 transition-all active:scale-95">
             Create AC Deal
           </button>
         </div>
@@ -72,10 +95,10 @@ const VendorDashboard = () => {
           <p className="text-gray-500 mt-1">Your AI assistant has prepared your daily performance report.</p>
         </div>
         <div className="flex gap-3">
-          <button className="bg-white border border-gray-100 text-gray-700 px-6 py-3 rounded-2xl text-sm font-bold hover:bg-gray-50 flex items-center shadow-sm transition-all">
+          <button onClick={() => navigate('/vendor/calendar')} className="bg-white border border-gray-100 text-gray-700 px-6 py-3 rounded-2xl text-sm font-bold hover:bg-gray-50 flex items-center shadow-sm transition-all">
             <Calendar className="h-4 w-4 mr-2" /> View Calendar
           </button>
-          <button className="bg-gray-900 text-white px-6 py-3 rounded-2xl text-sm font-bold hover:bg-red-600 flex items-center shadow-xl shadow-gray-900/10 transition-all">
+          <button onClick={() => navigate('/vendor/bookings')} className="bg-gray-900 text-white px-6 py-3 rounded-2xl text-sm font-bold hover:bg-red-600 flex items-center shadow-xl shadow-gray-900/10 transition-all">
             <Wrench className="h-4 w-4 mr-2" /> Add New Job
           </button>
         </div>
@@ -83,22 +106,31 @@ const VendorDashboard = () => {
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        {stats.map((stat) => (
-          <div key={stat.name} className="bg-white p-8 rounded-[2rem] border border-gray-100 shadow-sm hover:shadow-xl transition-all group">
-            <div className="flex items-center justify-between mb-6">
-              <div className={cn("p-4 rounded-2xl transition-colors", stat.bg)}>
-                <stat.icon className={cn("h-6 w-6", stat.color)} />
+        {stats.map((stat, idx) => {
+          const values = statsData ? [
+            statsData.totalBookings,
+            `AED ${Number(statsData.monthlyRevenue || 0).toLocaleString()}`,
+            Number(statsData.avgRating || 0).toFixed(1),
+            statsData.pending,
+          ] : null;
+          const override = values ? values[idx] : stat.value;
+          return (
+            <div key={stat.name} className="bg-white p-8 rounded-4xl border border-gray-100 shadow-sm hover:shadow-xl transition-all group">
+              <div className="flex items-center justify-between mb-6">
+                <div className={cn("p-4 rounded-2xl transition-colors", stat.bg)}>
+                  <stat.icon className={cn("h-6 w-6", stat.color)} />
+                </div>
+                <div className="flex flex-col items-end">
+                  <span className="text-[10px] font-bold text-green-600 bg-green-50 px-2 py-1 rounded-full flex items-center uppercase tracking-widest">
+                    <ArrowUpRight className="h-3 w-3 mr-1" /> 12%
+                  </span>
+                </div>
               </div>
-              <div className="flex flex-col items-end">
-                <span className="text-[10px] font-bold text-green-600 bg-green-50 px-2 py-1 rounded-full flex items-center uppercase tracking-widest">
-                  <ArrowUpRight className="h-3 w-3 mr-1" /> 12%
-                </span>
-              </div>
+              <h3 className="text-gray-400 text-xs font-bold uppercase tracking-widest">{stat.name}</h3>
+              <p className="text-3xl font-bold text-gray-900 mt-2">{override}</p>
             </div>
-            <h3 className="text-gray-400 text-xs font-bold uppercase tracking-widest">{stat.name}</h3>
-            <p className="text-3xl font-bold text-gray-900 mt-2">{stat.value}</p>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -120,7 +152,7 @@ const VendorDashboard = () => {
               <div className="space-y-6">
                 <div className="flex items-end justify-between h-32 gap-2">
                   {[40, 65, 45, 80, 55, 90, 70].map((h, i) => (
-                    <div key={i} className="flex-grow flex flex-col items-center gap-2 group">
+                    <div key={i} className="grow flex flex-col items-center gap-2 group">
                       <div className="w-full bg-gray-100 rounded-t-lg relative overflow-hidden h-full">
                         <div 
                           className={cn(
@@ -171,7 +203,7 @@ const VendorDashboard = () => {
                     </div>
                   </div>
                 ))}
-                <button className="w-full py-3 bg-gray-900 text-white rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-red-600 transition-all">
+                  <button onClick={() => navigate('/vendor/pricing')} className="w-full py-3 bg-gray-900 text-white rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-red-600 transition-all">
                   Apply AI Pricing
                 </button>
               </div>
@@ -182,7 +214,7 @@ const VendorDashboard = () => {
           <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm overflow-hidden">
             <div className="p-8 border-b border-gray-50 flex justify-between items-center">
               <h2 className="text-xl font-bold text-gray-900">Today's Schedule</h2>
-              <button className="text-red-600 text-sm font-bold hover:underline">View All Bookings</button>
+              <button onClick={() => navigate('/vendor/bookings')} className="text-red-600 text-sm font-bold hover:underline">View All Bookings</button>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-left">
@@ -197,7 +229,7 @@ const VendorDashboard = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
-                  {recentBookings.map((booking) => (
+                  {(recentBookingsData.length ? recentBookingsData : defaultRecentBookings).map((booking) => (
                     <tr key={booking.id} className="hover:bg-gray-50 transition-colors group">
                       <td className="px-8 py-6 text-sm font-bold text-gray-900">{booking.id}</td>
                       <td className="px-8 py-6">
@@ -277,7 +309,7 @@ const VendorDashboard = () => {
           </div>
 
           {/* AI-Powered Marketing */}
-          <div className="bg-gradient-to-br from-red-600 to-red-700 p-8 rounded-[2.5rem] text-white shadow-xl relative overflow-hidden">
+          <div className="bg-linear-to-br from-red-600 to-red-700 p-8 rounded-[2.5rem] text-white shadow-xl relative overflow-hidden">
             <div className="absolute -top-12 -right-12 w-32 h-32 bg-white/10 rounded-full blur-3xl" />
             <div className="relative z-10">
               <div className="flex items-center space-x-3 mb-8">
@@ -290,10 +322,10 @@ const VendorDashboard = () => {
                 Our AI identified <strong>150 past customers</strong> due for an oil change. Launch a targeted campaign?
               </p>
               <div className="space-y-3">
-                <button className="w-full py-4 bg-white text-red-600 rounded-2xl font-bold text-xs uppercase tracking-widest hover:bg-gray-100 transition-all active:scale-95">
+                <button onClick={() => navigate('/vendor/messages')} className="w-full py-4 bg-white text-red-600 rounded-2xl font-bold text-xs uppercase tracking-widest hover:bg-gray-100 transition-all active:scale-95">
                   Launch SMS Campaign
                 </button>
-                <button className="w-full py-4 bg-red-700 text-white rounded-2xl font-bold text-xs uppercase tracking-widest hover:bg-red-800 transition-all active:scale-95">
+                <button onClick={() => navigate('/vendor/promotions')} className="w-full py-4 bg-red-700 text-white rounded-2xl font-bold text-xs uppercase tracking-widest hover:bg-red-800 transition-all active:scale-95">
                   Create Email Blast
                 </button>
               </div>
@@ -310,7 +342,7 @@ const VendorDashboard = () => {
                 { label: 'Staff Shift', icon: Users },
                 { label: 'Broadcast', icon: MessageSquare },
               ].map((action, i) => (
-                <button key={i} className="flex flex-col items-center justify-center p-6 rounded-3xl border border-gray-50 hover:border-red-200 hover:bg-red-50 transition-all group">
+                <button key={i} onClick={() => navigate(i === 0 ? '/vendor/calendar' : i === 1 ? '/vendor/promotions' : i === 2 ? '/vendor/staff' : '/vendor/messages')} className="flex flex-col items-center justify-center p-6 rounded-3xl border border-gray-50 hover:border-red-200 hover:bg-red-50 transition-all group">
                   <action.icon className="h-6 w-6 text-gray-400 group-hover:text-red-600 mb-3 transition-colors" />
                   <span className="text-[10px] font-bold text-gray-500 group-hover:text-red-600 uppercase tracking-widest text-center">{action.label}</span>
                 </button>

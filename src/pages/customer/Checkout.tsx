@@ -26,6 +26,29 @@ const Checkout = () => {
   const navigate = useNavigate();
   const [step, setStep] = React.useState(1);
   const [showBundles, setShowBundles] = React.useState(true);
+  const [firstName, setFirstName] = React.useState('');
+  const [lastName, setLastName] = React.useState('');
+  const [email, setEmail] = React.useState('');
+  const [phone, setPhone] = React.useState('');
+  const [carModel, setCarModel] = React.useState('Camry');
+  const [carYear, setCarYear] = React.useState('2022');
+  const [license, setLicense] = React.useState('DXB-1234');
+  const [date, setDate] = React.useState('Oct 12, 2026');
+  const [time, setTime] = React.useState('10:00 AM');
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [vendorIdParam, setVendorIdParam] = React.useState<string | null>(null);
+  const [serviceParam, setServiceParam] = React.useState<string | null>(null);
+  const [priceParam, setPriceParam] = React.useState<number | null>(null);
+
+  React.useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const v = params.get('vendorId');
+    const s = params.get('service');
+    const p = params.get('price');
+    if (v) setVendorIdParam(v);
+    if (s) setServiceParam(s);
+    if (p) setPriceParam(Number(p));
+  }, []);
 
   const steps = [
     { id: 1, name: 'Your Details', icon: User },
@@ -54,7 +77,7 @@ const Checkout = () => {
               </span>
             </div>
             {i < steps.length - 1 && (
-              <div className="h-[2px] w-16 md:w-32 mx-4 rounded-full bg-gray-100 overflow-hidden">
+              <div className="h-0.5 w-16 md:w-32 mx-4 rounded-full bg-gray-100 overflow-hidden">
                 <div className={cn(
                   "h-full bg-red-600 transition-all duration-700",
                   step > s.id ? "w-full" : "w-0"
@@ -70,8 +93,8 @@ const Checkout = () => {
         <div className="lg:col-span-2 space-y-8">
           {/* AI Smart Bundle Upsell */}
           {showBundles && step === 2 && (
-            <div className="bg-gradient-to-br from-red-600 to-red-700 rounded-[2.5rem] p-8 text-white shadow-xl shadow-red-600/20 relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-64 h-full bg-gradient-to-l from-white/10 to-transparent pointer-events-none" />
+            <div className="bg-linear-to-br from-red-600 to-red-700 rounded-[2.5rem] p-8 text-white shadow-xl shadow-red-600/20 relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-64 h-full bg-linear-to-l from-white/10 to-transparent pointer-events-none" />
               <button 
                 onClick={() => setShowBundles(false)}
                 className="absolute top-6 right-6 p-1 hover:bg-white/10 rounded-full transition-colors"
@@ -110,19 +133,19 @@ const Checkout = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                   <div className="space-y-3">
                     <label className="text-xs font-bold text-gray-400 uppercase tracking-widest">First Name</label>
-                    <input type="text" placeholder="e.g. John" className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl focus:bg-white focus:border-red-600 outline-none transition-all font-medium" />
+                    <input value={firstName} onChange={(e) => setFirstName(e.target.value)} type="text" placeholder="e.g. John" className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl focus:bg-white focus:border-red-600 outline-none transition-all font-medium" />
                   </div>
                   <div className="space-y-3">
                     <label className="text-xs font-bold text-gray-400 uppercase tracking-widest">Last Name</label>
-                    <input type="text" placeholder="e.g. Doe" className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl focus:bg-white focus:border-red-600 outline-none transition-all font-medium" />
+                    <input value={lastName} onChange={(e) => setLastName(e.target.value)} type="text" placeholder="e.g. Doe" className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl focus:bg-white focus:border-red-600 outline-none transition-all font-medium" />
                   </div>
                   <div className="space-y-3">
                     <label className="text-xs font-bold text-gray-400 uppercase tracking-widest">Email Address</label>
-                    <input type="email" placeholder="e.g. john@example.com" className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl focus:bg-white focus:border-red-600 outline-none transition-all font-medium" />
+                    <input value={email} onChange={(e) => setEmail(e.target.value)} type="email" placeholder="e.g. john@example.com" className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl focus:bg-white focus:border-red-600 outline-none transition-all font-medium" />
                   </div>
                   <div className="space-y-3">
                     <label className="text-xs font-bold text-gray-400 uppercase tracking-widest">Phone Number</label>
-                    <input type="tel" placeholder="e.g. +971 50 123 4567" className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl focus:bg-white focus:border-red-600 outline-none transition-all font-medium" />
+                    <input value={phone} onChange={(e) => setPhone(e.target.value)} type="tel" placeholder="e.g. +971 50 123 4567" className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl focus:bg-white focus:border-red-600 outline-none transition-all font-medium" />
                   </div>
                 </div>
                 <div className="pt-8 border-t border-gray-50 flex justify-end">
@@ -156,31 +179,31 @@ const Checkout = () => {
                   </div>
                   <div className="space-y-3">
                     <label className="text-xs font-bold text-gray-400 uppercase tracking-widest">Model</label>
-                    <input type="text" placeholder="e.g. Camry" className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl focus:bg-white focus:border-red-600 outline-none transition-all font-medium" />
+                    <input value={carModel} onChange={(e) => setCarModel(e.target.value)} type="text" placeholder="e.g. Camry" className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl focus:bg-white focus:border-red-600 outline-none transition-all font-medium" />
                   </div>
                   <div className="space-y-3">
                     <label className="text-xs font-bold text-gray-400 uppercase tracking-widest">Year</label>
-                    <input type="number" placeholder="e.g. 2022" className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl focus:bg-white focus:border-red-600 outline-none transition-all font-medium" />
+                    <input value={carYear} onChange={(e) => setCarYear(e.target.value)} type="number" placeholder="e.g. 2022" className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl focus:bg-white focus:border-red-600 outline-none transition-all font-medium" />
                   </div>
                   <div className="space-y-3">
                     <label className="text-xs font-bold text-gray-400 uppercase tracking-widest">License Plate (Optional)</label>
-                    <input type="text" placeholder="e.g. DXB-1234" className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl focus:bg-white focus:border-red-600 outline-none transition-all font-medium" />
+                    <input value={license} onChange={(e) => setLicense(e.target.value)} type="text" placeholder="e.g. DXB-1234" className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl focus:bg-white focus:border-red-600 outline-none transition-all font-medium" />
                   </div>
                 </div>
-                <div className="pt-8 border-t border-gray-50 flex justify-between items-center">
-                  <button 
-                    onClick={() => setStep(1)}
-                    className="text-gray-400 font-bold hover:text-gray-600 transition-colors uppercase tracking-widest text-xs"
-                  >
-                    Back
-                  </button>
-                  <button 
-                    onClick={() => setStep(3)}
-                    className="bg-red-600 text-white px-10 py-4 rounded-2xl font-bold hover:bg-red-700 flex items-center shadow-xl shadow-red-600/20 transition-all active:scale-95"
-                  >
-                    Next Step <ChevronRight className="h-5 w-5 ml-2" />
-                  </button>
-                </div>
+                  <div className="pt-8 border-t border-gray-50 flex justify-between items-center">
+                    <button 
+                      onClick={() => setStep(1)}
+                      className="text-gray-400 font-bold hover:text-gray-600 transition-colors uppercase tracking-widest text-xs"
+                    >
+                      Back
+                    </button>
+                    <button 
+                      onClick={() => setStep(3)}
+                      className="bg-red-600 text-white px-10 py-4 rounded-2xl font-bold hover:bg-red-700 flex items-center shadow-xl shadow-red-600/20 transition-all active:scale-95"
+                    >
+                      Next Step <ChevronRight className="h-5 w-5 ml-2" />
+                    </button>
+                  </div>
               </div>
             )}
 
@@ -197,7 +220,7 @@ const Checkout = () => {
                     <div className="h-6 w-6 rounded-full border-2 border-red-600 flex items-center justify-center">
                       <div className="h-3 w-3 bg-red-600 rounded-full" />
                     </div>
-                    <div className="ml-6 flex-grow">
+                    <div className="ml-6 grow">
                       <p className="font-bold text-gray-900">Pay at Garage</p>
                       <p className="text-sm text-gray-500">No payment required now. Pay after service completion.</p>
                     </div>
@@ -205,7 +228,7 @@ const Checkout = () => {
                   </div>
                   <div className="p-6 border border-gray-100 rounded-3xl flex items-center opacity-50 cursor-not-allowed grayscale">
                     <div className="h-6 w-6 rounded-full border-2 border-gray-200" />
-                    <div className="ml-6 flex-grow">
+                    <div className="ml-6 grow">
                       <p className="font-bold text-gray-900">Credit / Debit Card</p>
                       <p className="text-sm text-gray-500">Secure online payment (Coming Soon)</p>
                     </div>
@@ -228,10 +251,47 @@ const Checkout = () => {
                     Back
                   </button>
                   <button 
-                    onClick={() => navigate('/confirmation')}
+                    onClick={async () => {
+                      if (isSubmitting) return;
+                      setIsSubmitting(true);
+                      try {
+                        const payload = {
+                          firstName,
+                          lastName,
+                          email,
+                          phone,
+                          carModel,
+                          carYear,
+                          license,
+                          date,
+                          time,
+                          service: serviceParam || 'General Service',
+                          price: priceParam || 367.5,
+                          vendorId: vendorIdParam || 'vendor-1'
+                        };
+                        const res = await fetch('/api/bookings', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify(payload)
+                        });
+                        const data = await res.json();
+                        if (res.ok) {
+                          // remember customer email for MyBookings
+                          try { localStorage.setItem('userEmail', email); } catch {}
+                          navigate('/confirmation');
+                        } else {
+                          alert(data.message || 'Booking failed');
+                        }
+                      } catch (err) {
+                        console.error(err);
+                        alert('Network error');
+                      } finally {
+                        setIsSubmitting(false);
+                      }
+                    }}
                     className="bg-red-600 text-white px-10 py-4 rounded-2xl font-bold hover:bg-red-700 flex items-center shadow-xl shadow-red-600/20 transition-all active:scale-95"
                   >
-                    Confirm Booking <Lock className="h-5 w-5 ml-2" />
+                    {isSubmitting ? 'Confirming...' : 'Confirm Booking'} <Lock className="h-5 w-5 ml-2" />
                   </button>
                 </div>
               </div>
@@ -310,7 +370,7 @@ const Checkout = () => {
             </div>
           </div>
 
-          <div className="bg-blue-50 p-6 rounded-[2rem] border border-blue-100 relative overflow-hidden">
+          <div className="bg-blue-50 p-6 rounded-4xl border border-blue-100 relative overflow-hidden">
             <div className="absolute -top-4 -right-4 w-16 h-16 bg-blue-100 rounded-full blur-2xl" />
             <h4 className="text-sm font-bold text-blue-900 mb-3 flex items-center relative z-10">
               <Info className="h-4 w-4 mr-2" /> Cancellation Policy

@@ -9,6 +9,8 @@ const AdminAnalytics = () => {
     { name: 'Active Vendors', value: '850', change: '+5.1%', icon: Building2, color: 'text-green-600', bg: 'bg-green-50' },
     { name: 'Avg. Commission', value: '12.5%', change: '+0.4%', icon: Percent, color: 'text-yellow-600', bg: 'bg-yellow-50' },
   ];
+  const revenueSeries = [32, 48, 41, 58, 72, 66, 84];
+  const acquisitionSeries = [24, 38, 45, 52, 47, 61, 68];
 
   return (
     <div className="space-y-6">
@@ -59,8 +61,15 @@ const AdminAnalytics = () => {
               <button className="px-3 py-1 text-xs font-bold rounded-md text-gray-500 hover:text-gray-700">Monthly</button>
             </div>
           </div>
-          <div className="h-64 bg-gray-50 rounded-lg flex items-center justify-center border border-dashed border-gray-300">
-            <p className="text-gray-400 text-sm font-medium">Revenue Trends Visualization Coming Soon</p>
+          <div className="h-64 bg-gray-50 rounded-lg border border-dashed border-gray-300 p-4 flex items-end gap-3">
+            {revenueSeries.map((value, index) => (
+              <div key={index} className="flex-1 flex flex-col items-center justify-end h-full gap-2">
+                <div className="w-full bg-red-100 rounded-t-lg overflow-hidden flex items-end h-full">
+                  <div className="w-full bg-red-600 rounded-t-lg" style={{ height: `${value}%` }} />
+                </div>
+                <span className="text-[10px] font-bold text-gray-400 uppercase">W{index + 1}</span>
+              </div>
+            ))}
           </div>
         </div>
         <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
@@ -71,8 +80,15 @@ const AdminAnalytics = () => {
               <button className="px-3 py-1 text-xs font-bold rounded-md text-gray-500 hover:text-gray-700">Region</button>
             </div>
           </div>
-          <div className="h-64 bg-gray-50 rounded-lg flex items-center justify-center border border-dashed border-gray-300">
-            <p className="text-gray-400 text-sm font-medium">User Acquisition Visualization Coming Soon</p>
+          <div className="h-64 bg-gray-50 rounded-lg border border-dashed border-gray-300 p-4 flex items-end gap-3">
+            {acquisitionSeries.map((value, index) => (
+              <div key={index} className="flex-1 flex flex-col items-center justify-end h-full gap-2">
+                <div className="w-full bg-blue-100 rounded-t-lg overflow-hidden flex items-end h-full">
+                  <div className="w-full bg-blue-600 rounded-t-lg" style={{ height: `${value}%` }} />
+                </div>
+                <span className="text-[10px] font-bold text-gray-400 uppercase">M{index + 1}</span>
+              </div>
+            ))}
           </div>
         </div>
       </div>

@@ -6,8 +6,39 @@ import { cn } from '../../lib/utils';
 const SearchResults = () => {
   const navigate = useNavigate();
   const [viewMode, setViewMode] = React.useState<'list' | 'map'>('list');
+  const [garages, setGarages] = React.useState<any[]>([]);
 
-  const garages = [
+  React.useEffect(() => {
+    const load = async () => {
+      try {
+        const res = await fetch('/api/services');
+        const services = await res.json();
+        // map services to garages for display
+        const mapped = services.map((s: any, i: number) => ({
+          id: i + 1,
+          name: s.name + ' - ' + (s.shop || 'Local Garage'),
+          location: 'Nearby',
+          distance: `${(i + 1) * 1.2} miles away`,
+          rating: 4.5 + (i * 0.1),
+          reviews: 100 + i * 50,
+          price: s.price || s.cost || 100,
+          marketPrice: (s.price || 100) + 20,
+          services: [s.name],
+          availability: 'Tomorrow, 10:00 AM',
+          image: `https://picsum.photos/seed/garage${i+1}/400/250`,
+          badge: i === 0 ? 'Top Rated' : undefined,
+          trustScore: 90 + i,
+          isFairValue: true,
+        }));
+        setGarages(mapped);
+      } catch (err) {
+        console.error(err);
+      }
+    };
+    load();
+  }, []);
+
+  const defaultGarages = [
     {
       id: 1,
       name: 'Elite Auto Care',
@@ -63,7 +94,7 @@ const SearchResults = () => {
     <div className="max-w-7xl mx-auto px-4 py-8">
       {/* AI Alerts System */}
       <div className="mb-8 space-y-3">
-        {garages.filter(g => g.aiAlert).map((g, i) => (
+        {(garages.length ? garages : defaultGarages).filter(g => g.aiAlert).map((g, i) => (
           <div key={i} className="bg-red-50 border border-red-100 p-4 rounded-2xl flex items-start space-x-3 animate-pulse">
             <AlertCircle className="h-5 w-5 text-red-600 shrink-0 mt-0.5" />
             <div>
@@ -76,11 +107,11 @@ const SearchResults = () => {
 
       {/* Search Bar (Condensed) */}
       <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 mb-8 flex flex-col md:flex-row gap-4 items-center">
-        <div className="flex-grow flex items-center bg-gray-50 rounded-xl px-4 py-3 w-full border border-transparent focus-within:border-blue-200 transition-all">
+        <div className="grow flex items-center bg-gray-50 rounded-xl px-4 py-3 w-full border border-transparent focus-within:border-blue-200 transition-all">
           <MapPin className="h-4 w-4 text-gray-400 mr-3" />
           <input type="text" defaultValue="Los Angeles, CA" className="bg-transparent outline-none text-sm w-full font-medium" />
         </div>
-        <div className="flex-grow flex items-center bg-gray-50 rounded-xl px-4 py-3 w-full border border-transparent focus-within:border-blue-200 transition-all">
+        <div className="grow flex items-center bg-gray-50 rounded-xl px-4 py-3 w-full border border-transparent focus-within:border-blue-200 transition-all">
           <Sparkles className="h-4 w-4 text-red-600 mr-3" />
           <input type="text" placeholder="Ask AI: 'Best value for SUV brake repair'" className="bg-transparent outline-none text-sm w-full font-medium placeholder:text-gray-400" />
         </div>
@@ -93,7 +124,7 @@ const SearchResults = () => {
         {/* Filters Sidebar */}
         <aside className="w-full lg:w-72 space-y-6">
           {/* AI Smart Filters */}
-          <div className="bg-gradient-to-br from-red-600 to-red-700 p-6 rounded-3xl shadow-xl text-white">
+          <div className="bg-linear-to-br from-red-600 to-red-700 p-6 rounded-3xl shadow-xl text-white">
             <div className="flex items-center space-x-2 mb-4">
               <Sparkles className="h-5 w-5 fill-current text-yellow-400" />
               <h3 className="font-bold text-lg">AI Smart Filters</h3>
@@ -162,10 +193,10 @@ const SearchResults = () => {
         </aside>
 
         {/* Results Area */}
-        <div className="flex-grow">
+        <div className="grow">
           <div className="flex justify-between items-center mb-8">
             <div>
-              <h2 className="text-2xl font-bold text-gray-900">Los Angeles: {garages.length} garages found</h2>
+              <h2 className="text-2xl font-bold text-gray-900">Los Angeles: {(garages.length ? garages : defaultGarages).length} garages found</h2>
               <p className="text-sm text-gray-500 mt-1">AI has sorted results by best value and proximity.</p>
             </div>
             <div className="flex items-center bg-white border border-gray-100 rounded-2xl p-1 shadow-sm">
@@ -185,10 +216,10 @@ const SearchResults = () => {
           </div>
 
           <div className="space-y-8">
-            {garages.map((garage) => (
+            {(garages.length ? garages : defaultGarages).map((garage) => (
               <div 
                 key={garage.id} 
-                className="bg-white rounded-[2rem] border border-gray-100 shadow-sm overflow-hidden flex flex-col md:flex-row hover:shadow-2xl hover:border-red-100 transition-all duration-500 group cursor-pointer"
+                className="bg-white rounded-4xl border border-gray-100 shadow-sm overflow-hidden flex flex-col md:flex-row hover:shadow-2xl hover:border-red-100 transition-all duration-500 group cursor-pointer"
                 onClick={() => navigate(`/garage/${garage.id}`)}
               >
                 <div className="w-full md:w-80 h-64 md:h-auto relative overflow-hidden">
@@ -220,7 +251,7 @@ const SearchResults = () => {
                   </div>
                 </div>
                 
-                <div className="flex-grow p-8 flex flex-col justify-between">
+                <div className="grow p-8 flex flex-col justify-between">
                   <div>
                     <div className="flex justify-between items-start mb-4">
                       <div>
@@ -264,7 +295,7 @@ const SearchResults = () => {
                         <span className="text-xs font-bold text-green-600">Save AED {garage.marketPrice - garage.price}</span>
                       </div>
                       <div className="mt-2 flex items-center space-x-4">
-                        <div className="flex-grow h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                        <div className="grow h-1.5 bg-gray-200 rounded-full overflow-hidden">
                           <div className="h-full bg-blue-600 rounded-full" style={{ width: '70%' }} />
                         </div>
                         <span className="text-[10px] font-bold text-gray-400">Market: AED {garage.marketPrice}</span>
@@ -281,9 +312,11 @@ const SearchResults = () => {
                         <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Starts from</p>
                         <p className="text-2xl font-bold text-gray-900">AED {garage.price}</p>
                       </div>
-                      <button className="bg-gray-900 text-white px-8 py-3.5 rounded-2xl font-bold text-sm hover:bg-red-600 transition-all active:scale-95 shadow-xl shadow-gray-900/10">
-                        Book Now
-                      </button>
+                      <button className="bg-gray-900 text-white px-8 py-3.5 rounded-2xl font-bold text-sm hover:bg-red-600 transition-all active:scale-95 shadow-xl shadow-gray-900/10"
+                        onClick={() => navigate(`/checkout?vendorId=vendor-${garage.id}&service=${encodeURIComponent(garage.services[0])}&price=${encodeURIComponent(garage.price)}`)}
+                      >
+                          Book Now
+                        </button>
                     </div>
                   </div>
                 </div>

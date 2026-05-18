@@ -130,12 +130,12 @@ const Footer = () => {
             </ul>
           </div>
         </div>
-        <div className="mt-8 flex flex-col md:flex-row justify-between items-center text-sm text-white/60">
+          <div className="mt-8 flex flex-col md:flex-row justify-between items-center text-sm text-white/60">
           <p>© 2026 CarServ.com. All rights reserved.</p>
           <div className="flex space-x-6 mt-4 md:mt-0">
-            <Link to="/" className="hover:text-white">Facebook</Link>
-            <Link to="/" className="hover:text-white">Twitter</Link>
-            <Link to="/" className="hover:text-white">Instagram</Link>
+            <a href="https://facebook.com" target="_blank" rel="noreferrer" className="hover:text-white">Facebook</a>
+            <a href="https://twitter.com" target="_blank" rel="noreferrer" className="hover:text-white">Twitter</a>
+            <a href="https://instagram.com" target="_blank" rel="noreferrer" className="hover:text-white">Instagram</a>
           </div>
         </div>
       </div>

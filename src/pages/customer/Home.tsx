@@ -13,7 +13,11 @@ const Home = () => {
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    navigate('/search');
+    const params = new URLSearchParams();
+    if (searchQuery.location) params.set('location', searchQuery.location);
+    if (searchQuery.carModel) params.set('carModel', searchQuery.carModel);
+    if (searchQuery.serviceType) params.set('serviceType', searchQuery.serviceType);
+    navigate(`/search?${params.toString()}`);
   };
 
   return (
@@ -75,7 +79,6 @@ const Home = () => {
             </div>
           </div>
 
-          {/* AI Genie Inline Placeholder - Removed as per user request for separate floating button */}
           <div className="hidden lg:block">
           </div>
         </div>

@@ -3,20 +3,46 @@ import { MessageSquare, Search, Filter, MoreVertical, Send, User, Building2, Che
 import { cn } from '../../lib/utils';
 
 const VendorMessages = () => {
-  const [activeChat, setActiveChat] = React.useState(1);
+  const [activeChat, setActiveChat] = React.useState<number | null>(null);
+  const [chats, setChats] = React.useState<any[]>([]);
+  const [messages, setMessages] = React.useState<any[]>([]);
+  const [messageInput, setMessageInput] = React.useState('');
 
-  const chats = [
-    { id: 1, name: 'John Doe', lastMessage: 'Is my car ready for pickup?', time: '10:30 AM', unread: 2, status: 'online', image: 'https://i.pravatar.cc/150?u=john' },
-    { id: 2, name: 'Sarah Smith', lastMessage: 'Thank you for the quick service!', time: 'Yesterday', unread: 0, status: 'offline', image: 'https://i.pravatar.cc/150?u=sarah' },
-    { id: 3, name: 'Mike Johnson', lastMessage: 'Can I reschedule my appointment?', time: 'Oct 10', unread: 0, status: 'offline', image: 'https://i.pravatar.cc/150?u=mike' },
-    { id: 4, name: 'Emily Davis', lastMessage: 'How much for the brake pads?', time: 'Oct 09', unread: 0, status: 'online', image: 'https://i.pravatar.cc/150?u=emily' },
-  ];
+  React.useEffect(() => {
+    const load = async () => {
+      try {
+        const res = await fetch('/api/messages');
+        const data = await res.json();
+        setChats(data.chats || []);
+        setMessages([]);
+        if (data.chats && data.chats.length) setActiveChat(data.chats[0].id);
+        // messages map is returned as object keyed by threadId
+        if (data.messages) {
+          const first = data.chats && data.chats[0] && data.messages[data.chats[0].id];
+          if (first) setMessages(first);
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    };
+    load();
+  }, []);
 
-  const messages = [
-    { id: 1, text: 'Hello! I wanted to check the status of my Toyota Camry.', sender: 'customer', time: '09:15 AM' },
-    { id: 2, text: 'Hi John! We\'ve completed the oil change and the 50-point inspection. We\'re just finishing up the final checks.', sender: 'vendor', time: '09:30 AM' },
-    { id: 3, text: 'That\'s great news. Is my car ready for pickup?', sender: 'customer', time: '10:30 AM' },
-  ];
+  React.useEffect(() => {
+    // when activeChat changes, load its messages from server-side store
+    const loadThread = async () => {
+      if (!activeChat) return;
+      try {
+        const res = await fetch('/api/messages');
+        const data = await res.json();
+        const msgs = (data.messages && data.messages[activeChat]) || [];
+        setMessages(msgs);
+      } catch (err) {
+        console.error(err);
+      }
+    };
+    loadThread();
+  }, [activeChat]);
 
   return (
     <div className="h-[calc(100vh-160px)] flex bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
@@ -117,12 +143,34 @@ const VendorMessages = () => {
 
         {/* Chat Input */}
         <div className="p-4 bg-white border-t border-gray-100">
-          <form className="flex items-center space-x-3" onSubmit={(e) => e.preventDefault()}>
+          <form className="flex items-center space-x-3" onSubmit={async (e) => {
+            e.preventDefault();
+            if (!activeChat || !messageInput.trim()) return;
+            try {
+              const res = await fetch('/api/messages', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ threadId: activeChat, sender: 'vendor', text: messageInput.trim() })
+              });
+              const data = await res.json();
+              if (res.ok) {
+                setMessages(prev => [...prev, data]);
+                setMessageInput('');
+              } else {
+                alert(data.message || 'Send failed');
+              }
+            } catch (err) {
+              console.error(err);
+              alert('Network error');
+            }
+          }}>
             <button type="button" className="p-2 text-gray-400 hover:text-gray-600">
               <Paperclip className="h-5 w-5" />
             </button>
             <div className="flex-grow relative">
               <input 
+                value={messageInput}
+                onChange={(e) => setMessageInput(e.target.value)}
                 type="text" 
                 placeholder="Type your message..." 
                 className="w-full pl-4 pr-10 py-2 border border-gray-200 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-[#003580] focus:border-transparent"

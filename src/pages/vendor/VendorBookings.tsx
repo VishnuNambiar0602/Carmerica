@@ -19,14 +19,20 @@ import { cn } from '../../lib/utils';
 
 const VendorBookings = () => {
   const [activeTab, setActiveTab] = React.useState<'all' | 'pending' | 'active' | 'completed'>('all');
+  const [bookings, setBookings] = React.useState<any[]>([]);
 
-  const bookings = [
-    { id: "BK-1029", customer: "John Doe", car: "Toyota Camry (2022)", service: "Oil Change", date: "Oct 12, 2026", time: "10:00 AM", status: "In Progress", price: 89.00 },
-    { id: "BK-1030", customer: "Sarah Smith", car: "Honda Civic (2021)", service: "Brake Repair", date: "Oct 12, 2026", time: "11:30 AM", status: "Pending", price: 120.00 },
-    { id: "BK-1031", customer: "Mike Johnson", car: "Ford F-150 (2020)", service: "General Service", date: "Oct 12, 2026", time: "01:00 PM", status: "Confirmed", price: 189.00 },
-    { id: "BK-1032", customer: "Emily Davis", car: "Tesla Model 3 (2023)", service: "AC Service", date: "Oct 12, 2026", time: "02:30 PM", status: "Confirmed", price: 65.00 },
-    { id: "BK-1028", customer: "Robert Brown", car: "BMW 3 Series (2019)", service: "Full Service", date: "Oct 11, 2026", time: "09:00 AM", status: "Completed", price: 250.00 },
-  ];
+  React.useEffect(() => {
+    const load = async () => {
+      try {
+        const res = await fetch('/api/bookings');
+        const data = await res.json();
+        setBookings(data || []);
+      } catch (err) {
+        console.error(err);
+      }
+    };
+    load();
+  }, []);
 
   const filteredBookings = bookings.filter(b => {
     if (activeTab === 'all') return true;

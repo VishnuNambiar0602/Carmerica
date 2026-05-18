@@ -16,6 +16,7 @@ const VendorEarnings = () => {
     { id: 'TXN-9024', date: 'Oct 09, 2026', customer: 'Emily Davis', service: 'AC Service', amount: 65.00, status: 'completed' },
     { id: 'TXN-9025', date: 'Oct 08, 2026', customer: 'Robert Brown', service: 'Battery Replacement', amount: 150.00, status: 'failed' },
   ];
+  const revenueSeries = [18, 32, 26, 44, 38, 52, 48];
 
   return (
     <div className="space-y-6">
@@ -56,7 +57,6 @@ const VendorEarnings = () => {
         ))}
       </div>
 
-      {/* Revenue Chart Placeholder */}
       <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
         <div className="flex justify-between items-center mb-6">
           <h2 className="font-bold text-gray-900">Revenue Overview</h2>
@@ -66,8 +66,15 @@ const VendorEarnings = () => {
             <button className="px-3 py-1 text-xs font-bold rounded-md text-gray-500 hover:text-gray-700">12 Months</button>
           </div>
         </div>
-        <div className="h-64 bg-gray-50 rounded-lg flex items-center justify-center border border-dashed border-gray-300">
-          <p className="text-gray-400 text-sm font-medium">Revenue Chart Visualization Coming Soon</p>
+        <div className="h-64 bg-gray-50 rounded-lg border border-dashed border-gray-300 p-4 flex items-end gap-3">
+          {revenueSeries.map((value, index) => (
+            <div key={index} className="flex-1 flex flex-col items-center justify-end h-full gap-2">
+              <div className="w-full bg-blue-100 rounded-t-lg overflow-hidden flex items-end h-full">
+                <div className="w-full bg-[#003580] rounded-t-lg" style={{ height: `${value}%` }} />
+              </div>
+              <span className="text-[10px] font-bold text-gray-400 uppercase">D{index + 1}</span>
+            </div>
+          ))}
         </div>
       </div>
 

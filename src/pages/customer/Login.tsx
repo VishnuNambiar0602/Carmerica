@@ -12,10 +12,24 @@ const Login = () => {
     fullName: ''
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Simulate login/signup
-    navigate('/');
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: formData.email, password: formData.password, role: 'customer' })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        navigate('/');
+      } else {
+        alert(data.message || 'Login failed');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Network error');
+    }
   };
 
   return (
@@ -142,9 +156,9 @@ const Login = () => {
                 </div>
 
                 <div className="text-sm">
-                  <a href="#" className="font-bold text-[#0071c2] hover:underline">
+                  <Link to="/forgot-password" className="font-bold text-[#0071c2] hover:underline">
                     Forgot password?
-                  </a>
+                  </Link>
                 </div>
               </div>
             )}

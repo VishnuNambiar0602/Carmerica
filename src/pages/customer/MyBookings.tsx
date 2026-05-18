@@ -25,52 +25,24 @@ import { Link } from 'react-router-dom';
 
 const MyBookings = () => {
   const [activeTab, setActiveTab] = React.useState<'upcoming' | 'past'>('upcoming');
+  const [bookings, setBookings] = React.useState<any[]>([]);
+  const userEmail = typeof window !== 'undefined' ? localStorage.getItem('userEmail') : null;
 
-  const bookings = [
-    {
-      id: "BK-102938",
-      garage: "Elite Auto Care",
-      location: "Downtown, Dubai",
-      date: "Oct 12, 2026",
-      time: "10:00 AM",
-      service: "General Service",
-      car: "Toyota Camry (2022)",
-      status: "Confirmed",
-      price: 367.50,
-      type: "upcoming",
-      aiVerified: true,
-      savings: 45
-    },
-    {
-      id: "BK-102845",
-      garage: "Precision Mechanics",
-      location: "Al Quoz, Dubai",
-      date: "Sep 20, 2026",
-      time: "02:30 PM",
-      service: "Oil Change",
-      car: "Toyota Camry (2022)",
-      status: "Completed",
-      price: 250.00,
-      type: "past",
-      aiVerified: true,
-      reportAvailable: true
-    },
-    {
-      id: "BK-102712",
-      garage: "The Garage Co.",
-      location: "Jumeirah",
-      date: "Aug 15, 2026",
-      time: "09:00 AM",
-      service: "Brake Repair",
-      car: "Toyota Camry (2022)",
-      status: "Cancelled",
-      price: 420.00,
-      type: "past",
-      aiVerified: false
-    }
-  ];
+  React.useEffect(() => {
+    const load = async () => {
+      try {
+        if (!userEmail) return;
+        const res = await fetch(`/api/bookings?customerEmail=${encodeURIComponent(userEmail)}`);
+        const data = await res.json();
+        setBookings(data || []);
+      } catch (err) {
+        console.error(err);
+      }
+    };
+    load();
+  }, [userEmail]);
 
-  const filteredBookings = bookings.filter(b => b.type === activeTab);
+  const filteredBookings = bookings.filter(b => (activeTab === 'upcoming' ? ['Confirmed','Pending','In Progress'].includes(b.status) : b.status === 'Completed'));
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-16">
@@ -81,7 +53,7 @@ const MyBookings = () => {
         </div>
         
         {/* AI Lifecycle Reminder Banner */}
-        <div className="bg-gradient-to-r from-red-600 to-red-700 p-6 rounded-3xl text-white shadow-xl shadow-red-600/20 flex items-center space-x-6">
+        <div className="bg-linear-to-r from-red-600 to-red-700 p-6 rounded-3xl text-white shadow-xl shadow-red-600/20 flex items-center space-x-6">
           <div className="bg-white/20 p-3 rounded-2xl backdrop-blur-md">
             <Calendar className="h-6 w-6 text-white" />
           </div>

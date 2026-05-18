@@ -10,10 +10,24 @@ const VendorLogin = () => {
     password: ''
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Simulate vendor login
-    navigate('/vendor/dashboard');
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: formData.email, password: formData.password, role: 'vendor' })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        navigate('/vendor/dashboard');
+      } else {
+        alert(data.message || 'Login failed');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Network error');
+    }
   };
 
   return (
@@ -96,7 +110,7 @@ const VendorLogin = () => {
               <div className="space-y-1">
                 <div className="flex justify-between items-center">
                   <label className="text-sm font-bold text-gray-700">Password</label>
-                  <a href="#" className="text-xs font-bold text-[#003580] hover:underline">Forgot password?</a>
+                  <Link to="/vendor/forgot-password" className="text-xs font-bold text-[#003580] hover:underline">Forgot password?</Link>
                 </div>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -150,9 +164,9 @@ const VendorLogin = () => {
           <div className="pt-6 border-t border-gray-200">
             <p className="text-center text-sm text-gray-600">
               Not a partner yet?{' '}
-              <button className="font-bold text-[#003580] hover:underline">
+              <Link to="/vendor/register" className="font-bold text-[#003580] hover:underline">
                 Register your garage
-              </button>
+              </Link>
             </p>
           </div>
 

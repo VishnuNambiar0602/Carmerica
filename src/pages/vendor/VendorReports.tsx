@@ -9,6 +9,8 @@ const VendorReports = () => {
     { name: 'Avg. Order Value', value: '$122.50', change: '+5.1%', icon: Activity, color: 'text-yellow-600', bg: 'bg-yellow-50' },
     { name: 'Customer Retention', value: '68%', change: '+2.4%', icon: User, color: 'text-purple-600', bg: 'bg-purple-50' },
   ];
+  const revenueSeries = [22, 35, 29, 48, 55, 62, 70];
+  const serviceSeries = [42, 28, 18, 12];
 
   return (
     <div className="space-y-6">
@@ -59,8 +61,15 @@ const VendorReports = () => {
               <button className="px-3 py-1 text-xs font-bold rounded-md text-gray-500 hover:text-gray-700">Monthly</button>
             </div>
           </div>
-          <div className="h-64 bg-gray-50 rounded-lg flex items-center justify-center border border-dashed border-gray-300">
-            <p className="text-gray-400 text-sm font-medium">Revenue Growth Visualization Coming Soon</p>
+          <div className="h-64 bg-gray-50 rounded-lg border border-dashed border-gray-300 p-4 flex items-end gap-3">
+            {revenueSeries.map((value, index) => (
+              <div key={index} className="flex-1 flex flex-col items-center justify-end h-full gap-2">
+                <div className="w-full bg-green-100 rounded-t-lg overflow-hidden flex items-end h-full">
+                  <div className="w-full bg-green-600 rounded-t-lg" style={{ height: `${value}%` }} />
+                </div>
+                <span className="text-[10px] font-bold text-gray-400 uppercase">W{index + 1}</span>
+              </div>
+            ))}
           </div>
         </div>
         <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
@@ -71,8 +80,16 @@ const VendorReports = () => {
               <button className="px-3 py-1 text-xs font-bold rounded-md text-gray-500 hover:text-gray-700">Revenue</button>
             </div>
           </div>
-          <div className="h-64 bg-gray-50 rounded-lg flex items-center justify-center border border-dashed border-gray-300">
-            <p className="text-gray-400 text-sm font-medium">Service Distribution Visualization Coming Soon</p>
+          <div className="h-64 bg-gray-50 rounded-lg border border-dashed border-gray-300 p-4 flex flex-col justify-center gap-4">
+            {['Full Service', 'Oil Change', 'Brake Repair', 'AC Service'].map((label, index) => (
+              <div key={label} className="flex items-center gap-3">
+                <span className="w-28 text-xs font-bold text-gray-500">{label}</span>
+                <div className="flex-1 h-3 rounded-full bg-gray-200 overflow-hidden">
+                  <div className="h-full rounded-full bg-[#003580]" style={{ width: `${serviceSeries[index]}%` }} />
+                </div>
+                <span className="w-10 text-xs font-bold text-gray-500 text-right">{serviceSeries[index]}%</span>
+              </div>
+            ))}
           </div>
         </div>
       </div>
