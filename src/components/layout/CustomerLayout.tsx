@@ -1,17 +1,18 @@
 import React from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
-import { Car, Search, User, Menu, Phone, HelpCircle, Globe, Briefcase } from 'lucide-react';
+import { Car, Search, User, Menu, Phone, HelpCircle, Globe, Briefcase, MapPin } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
 const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = React.useState(false);
   const location = useLocation();
 
-  const navLinks = [
+  const navLinks: Array<{ name: string; path: string; icon?: React.ComponentType<{ className?: string }> }> = [
     { name: 'Home', path: '/' },
     { name: 'Services', path: '/search' },
     { name: 'Offers', path: '/offers' },
     { name: 'Smart Garage', path: '/smart-garage' },
+    { name: 'Map', path: '/garage-map', icon: MapPin },
   ];
 
   return (
@@ -25,20 +26,24 @@ const Navbar = () => {
             </Link>
             <div className="hidden md:block ml-10">
               <div className="flex items-baseline space-x-4">
-                {navLinks.map((link) => (
-                  <Link
-                    key={link.name}
-                    to={link.path}
-                    className={cn(
-                      "px-3 py-2 rounded-md text-sm font-medium transition-colors",
-                      location.pathname === link.path 
-                        ? "bg-[#00224f] text-white" 
-                        : "hover:bg-[#00224f] text-white/90 hover:text-white"
-                    )}
-                  >
-                    {link.name}
-                  </Link>
-                ))}
+                {navLinks.map((link) => {
+                  const Icon = link.icon;
+                  return (
+                    <Link
+                      key={link.name}
+                      to={link.path}
+                      className={cn(
+                        "px-3 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-1.5",
+                        location.pathname === link.path 
+                          ? "bg-[#00224f] text-white" 
+                          : "hover:bg-[#00224f] text-white/90 hover:text-white"
+                      )}
+                    >
+                      {Icon && <Icon className="h-4 w-4" />}
+                      {link.name}
+                    </Link>
+                  );
+                })}
               </div>
             </div>
           </div>
@@ -67,16 +72,20 @@ const Navbar = () => {
       {/* Mobile menu */}
       {isMenuOpen && (
         <div className="md:hidden bg-[#003580] border-t border-[#00224f] px-2 pt-2 pb-3 space-y-1 sm:px-3">
-          {navLinks.map((link) => (
-            <Link
-              key={link.name}
-              to={link.path}
-              className="block px-3 py-2 rounded-md text-base font-medium hover:bg-[#00224f]"
-              onClick={() => setIsMenuOpen(false)}
-            >
-              {link.name}
-            </Link>
-          ))}
+          {navLinks.map((link) => {
+            const Icon = link.icon;
+            return (
+              <Link
+                key={link.name}
+                to={link.path}
+                className="block px-3 py-2 rounded-md text-base font-medium hover:bg-[#00224f] flex items-center gap-2"
+                onClick={() => setIsMenuOpen(false)}
+              >
+                {Icon && <Icon className="h-4 w-4" />}
+                {link.name}
+              </Link>
+            );
+          })}
           <Link
             to="/login"
             className="block px-3 py-2 rounded-md text-base font-medium bg-white text-[#003580] mt-4"

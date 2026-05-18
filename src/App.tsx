@@ -5,7 +5,9 @@ import { VendorLayout } from './components/layout/VendorLayout';
 import { AdminLayout } from './components/layout/AdminLayout';
 
 import ChatWidget from './components/ChatWidget';
+import GarageMap from './components/GarageMap';
 import SmartGarage from './pages/customer/SmartGarage';
+import GarageMapPage from './pages/customer/GarageMapPage';
 import Home from './pages/customer/Home';
 import SearchResults from './pages/customer/SearchResults';
 import GarageDetails from './pages/customer/GarageDetails';
@@ -167,6 +169,7 @@ function App() {
           <Route path="confirmation" element={<Confirmation />} />
           <Route path="my-bookings" element={<MyBookings />} />
           <Route path="smart-garage" element={<SmartGarage />} />
+          <Route path="garage-map" element={<GarageMapPage />} />
           <Route path="profile" element={<Profile />} />
           <Route path="login" element={<Login />} />
           <Route path="forgot-password" element={<ForgotPassword />} />

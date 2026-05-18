@@ -4,6 +4,9 @@ import { motion, AnimatePresence } from 'motion/react';
 import type { ChatMessage, AgentType, AgentResponse } from '../types/chat';
 import { sendMessage } from '../services/AgentService';
 import ChatPanel from './ChatPanel';
+import GarageMap from './GarageMap';
+import { GarageLocator, type UserLocation } from '../services/GarageLocator';
+import { CALIFORNIA_GARAGES, type Garage } from '../data/garages';
 
 interface ChatWidgetState {
   isOpen: boolean;
@@ -11,6 +14,8 @@ interface ChatWidgetState {
   activeAgent: AgentType | null;
   isLoading: boolean;
   error: string | null;
+  showGarageMap: boolean;
+  userLocation: UserLocation | null;
 }
 
 const USER_ID = 'user-1';
@@ -34,9 +39,18 @@ export default function ChatWidget() {
     activeAgent: null,
     isLoading: false,
     error: null,
+    showGarageMap: false,
+    userLocation: null,
   });
 
   const [greetingTriggered, setGreetingTriggered] = useState(false);
+
+  // Get user location on mount
+  useEffect(() => {
+    GarageLocator.getUserLocation().then((location) => {
+      setState((prev) => ({ ...prev, userLocation: location }));
+    });
+  }, []);
 
   const processResponse = useCallback((response: AgentResponse) => {
     setState((prev) => {
@@ -174,6 +188,9 @@ export default function ChatWidget() {
     async (text: string) => {
       if (state.isLoading) return;
 
+      // Check if user is asking for nearest garage
+      const isGarageQuery = /nearest|closest|near me|garages|garage|map|find.*garage|show.*garage/i.test(text);
+
       const userMessage: ChatMessage = {
         id: createMessageId(),
         role: 'user',
@@ -190,13 +207,39 @@ export default function ChatWidget() {
       }));
 
       try {
-        const response = await sendMessage({
-          userMessage: text,
-          conversationHistory: [...historyBeforeUpdate, userMessage],
-          currentAgent: state.activeAgent,
-          userId: USER_ID,
-        });
-        processResponse(response);
+        // If asking for nearest garage, show garage results
+        if (isGarageQuery && state.userLocation) {
+          // Check if they're asking for just one garage
+          const isOneGarageQuery = /\bone\b|one garage|just one|single|closest one/i.test(text);
+          const limit = isOneGarageQuery ? 1 : 5;
+          
+          const nearestGarages = GarageLocator.findNearestGarages(CALIFORNIA_GARAGES, state.userLocation, limit);
+          
+          const garageResultMessage: ChatMessage = {
+            id: createMessageId(),
+            role: 'agent',
+            text: `I found ${nearestGarages.length} ${nearestGarages.length === 1 ? 'garage' : 'garages'} near you! Here ${nearestGarages.length === 1 ? 'is the closest option' : 'are the closest options'}:`,
+            agentType: 'team_lead',
+            agentName: 'Jordan (Team Lead)',
+            timestamp: Date.now(),
+            garageResults: nearestGarages,
+          };
+
+          setState((prev) => ({
+            ...prev,
+            messages: [...prev.messages, garageResultMessage],
+            isLoading: false,
+          }));
+        } else {
+          // Regular message to AI agents
+          const response = await sendMessage({
+            userMessage: text,
+            conversationHistory: [...historyBeforeUpdate, userMessage],
+            currentAgent: state.activeAgent,
+            userId: USER_ID,
+          });
+          processResponse(response);
+        }
       } catch (err) {
         console.error('Chat message error:', err);
         setState((prev) => ({
@@ -206,11 +249,29 @@ export default function ChatWidget() {
         }));
       }
     },
-    [state.isLoading, state.messages, state.activeAgent, processResponse],
+    [state.isLoading, state.messages, state.activeAgent, state.userLocation, processResponse],
   );
 
   return (
     <AnimatePresence>
+      {state.showGarageMap && (
+        <GarageMap
+          onClose={() => setState((prev) => ({ ...prev, showGarageMap: false }))}
+          onGarageSelect={(garage) => {
+            // Add garage selection to chat
+            const garageMessage: ChatMessage = {
+              id: createMessageId(),
+              role: 'user',
+              text: `I'm interested in ${garage.name}`,
+              timestamp: Date.now(),
+            };
+            setState((prev) => ({
+              ...prev,
+              messages: [...prev.messages, garageMessage],
+            }));
+          }}
+        />
+      )}
       {!state.isOpen ? (
         <motion.button
           key="chat-button"
@@ -245,6 +306,8 @@ export default function ChatWidget() {
           onSendMessage={handleSendMessage}
           onClose={handleClose}
           onAgentSwitch={handleAgentSwitch}
+          onOpenGarageMap={() => setState((prev) => ({ ...prev, showGarageMap: true }))}
+          userLocation={state.userLocation}
         />
       )}
     </AnimatePresence>

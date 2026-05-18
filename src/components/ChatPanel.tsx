@@ -1,8 +1,10 @@
 import React, { useState, useRef, useEffect, KeyboardEvent } from 'react';
-import { X, Send, Bot, Zap, ChevronDown, Users } from 'lucide-react';
+import { X, Send, Bot, Zap, ChevronDown, Users, MapPin } from 'lucide-react';
 import { motion, AnimatePresence, useMotionValue, useSpring, useTransform } from 'motion/react';
 import type { ChatMessage, AgentType } from '../types/chat';
 import { cn } from '../lib/utils';
+import { GarageResults } from './GarageResults';
+
 
 interface ChatPanelProps {
   messages: ChatMessage[];
@@ -12,6 +14,8 @@ interface ChatPanelProps {
   onSendMessage: (text: string) => void;
   onClose: () => void;
   onAgentSwitch: (agent: AgentType) => void;
+  onOpenGarageMap?: () => void;
+  userLocation?: { lat: number; lng: number } | null;
 }
 
 const AGENT_DATA: Record<AgentType, { name: string; role: string; color: string; accent: string }> = {
@@ -30,6 +34,8 @@ export default function ChatPanel({
   onSendMessage,
   onClose,
   onAgentSwitch,
+  onOpenGarageMap,
+  userLocation,
 }: ChatPanelProps) {
   const [inputText, setInputText] = useState('');
   const [showAgentSelector, setShowAgentSelector] = useState(false);
@@ -125,6 +131,15 @@ export default function ChatPanel({
           <button onClick={onClose} className="h-10 w-10 rounded-xl bg-white/10 hover:bg-white/20 transition-all border border-white/10 flex items-center justify-center">
             <X size={18} className="text-white" />
           </button>
+          {onOpenGarageMap && (
+            <button
+              onClick={onOpenGarageMap}
+              className="h-10 w-10 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 transition-all border border-emerald-400/30 flex items-center justify-center"
+              title="View garage map"
+            >
+              <MapPin size={18} className="text-emerald-300" />
+            </button>
+          )}
         </div>
 
         {/* Agent Selector Dropdown */}
@@ -203,6 +218,20 @@ export default function ChatPanel({
                 )}>
                   <p className="relative z-10 whitespace-pre-wrap leading-relaxed">{message.text}</p>
                 </div>
+                
+                {/* Garage Results Display */}
+                {message.garageResults && message.garageResults.length > 0 && (
+                  <div className="max-w-[85%] mt-3 w-full">
+                    <GarageResults
+                      garages={message.garageResults}
+                      userLocation={userLocation || undefined}
+                      onOpenMap={onOpenGarageMap}
+                      onGetDirections={(garage) => {
+                        window.location.href = `/garage-map?garageId=${garage.id}`;
+                      }}
+                    />
+                  </div>
+                )}
               </motion.div>
             );
           })}

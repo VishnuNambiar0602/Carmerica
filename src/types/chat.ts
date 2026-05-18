@@ -8,6 +8,7 @@ export interface ChatMessage {
   agentName?: string;
   isHandoff?: boolean;
   timestamp: number;
+  garageResults?: any[];
 }
 
 export interface AgentConfig {
