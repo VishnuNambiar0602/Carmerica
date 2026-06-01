@@ -2,6 +2,7 @@ import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { cacheDel, cacheGet, cacheSet } from './lib/redis.js';
+import { getAIStatus, sendAIMessage } from './lib/aiSupport.js';
 import { isSupabaseConfigured } from './lib/supabase.js';
 
 type Role = 'customer' | 'vendor' | 'admin';
@@ -196,6 +197,28 @@ router.get('/hello', (_req, res) => res.json({ message: 'Hello from the API!' })
 
 router.get('/health/db', (_req, res) => {
   res.json({ status: 'ok', database: isSupabaseConfigured() ? 'supabase' : 'memory-backed', cache: process.env.REDIS_URL ? 'redis' : 'memory-backed' });
+});
+
+router.get('/ai/health', (_req, res) => {
+  res.json(getAIStatus());
+});
+
+router.post('/ai/chat', async (req, res, next) => {
+  try {
+    const userMessage = String(req.body.userMessage || '');
+    const conversationHistory = Array.isArray(req.body.conversationHistory) ? req.body.conversationHistory : [];
+    const currentAgent = req.body.currentAgent || null;
+    const userId = String(req.body.userId || 'user-1');
+
+    if (!userMessage.trim() && conversationHistory.length > 0) {
+      return res.status(400).json({ message: 'userMessage is required' });
+    }
+
+    const response = await sendAIMessage({ userMessage, conversationHistory, currentAgent, userId });
+    res.json(response);
+  } catch (error) {
+    next(error);
+  }
 });
 
 router.post('/auth/register', async (req, res) => {

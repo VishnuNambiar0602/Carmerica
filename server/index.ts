@@ -4,6 +4,9 @@ import dotenv from 'dotenv';
 import helmet from 'helmet';
 import compression from 'compression';
 import rateLimit from 'express-rate-limit';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import apiRoutes from './routes.js';
 import { errorHandler, requestLogger } from './middleware.js';
 import { getRedisClient } from './lib/redis.js';
@@ -15,6 +18,8 @@ dotenv.config();
 const app = express();
 const port = Number(process.env.PORT || 5000);
 const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'http://localhost:3000').split(',').map((origin) => origin.trim()).filter(Boolean);
+const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const distDir = path.join(rootDir, 'dist');
 
 // Middleware
 app.use(helmet());
@@ -56,6 +61,14 @@ app.get('/health', async (_req, res) => {
     },
   });
 });
+
+if (fs.existsSync(distDir)) {
+  app.use(express.static(distDir));
+  app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api') || req.path === '/health') return next();
+    res.sendFile(path.join(distDir, 'index.html'));
+  });
+}
 
 app.use(errorHandler);
 
