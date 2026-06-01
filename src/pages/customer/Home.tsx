@@ -1,7 +1,31 @@
 import React from 'react';
-import { Search, MapPin, Calendar, Car, Shield, Star, Clock, ChevronRight, Sparkles, Zap, TrendingUp, ShieldCheck } from 'lucide-react';
+import { Search, MapPin, Calendar, Car, Shield, Star, Clock, ChevronRight, Sparkles, Zap, TrendingUp, ShieldCheck, BellRing, BadgePercent, LogIn } from 'lucide-react';
 import { useNavigate, Link } from 'react-router-dom';
 import { cn } from '../../lib/utils';
+
+const promoCards = [
+  {
+    title: 'Login now and save 15%',
+    text: 'Unlock an instant 15% discount on your first 2 bookings when you sign in today.',
+    badge: 'Limited time',
+    accent: 'from-amber-400/30 via-white/95 to-white',
+    icon: BadgePercent,
+  },
+  {
+    title: 'Members get early deals',
+    text: 'Sign in to get priority access to flash offers, loyalty rewards, and price drops.',
+    badge: 'Flash alert',
+    accent: 'from-sky-400/25 via-white/95 to-white',
+    icon: BellRing,
+  },
+  {
+    title: 'Quick sign-in, better prices',
+    text: 'Create a login to unlock member-only discounts before you book your next service.',
+    badge: 'Best value',
+    accent: 'from-emerald-400/25 via-white/95 to-white',
+    icon: LogIn,
+  },
+];
 
 const Home = () => {
   const navigate = useNavigate();
@@ -10,6 +34,15 @@ const Home = () => {
     carModel: '',
     serviceType: ''
   });
+  const [promoIndex, setPromoIndex] = React.useState(0);
+
+  React.useEffect(() => {
+    const timer = window.setInterval(() => {
+      setPromoIndex((current) => (current + 1) % promoCards.length);
+    }, 3500);
+
+    return () => window.clearInterval(timer);
+  }, []);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -79,7 +112,100 @@ const Home = () => {
             </div>
           </div>
 
-          <div className="hidden lg:block">
+          <div className="hidden lg:flex justify-end">
+            <div className="relative w-full max-w-md pt-10 pr-4">
+              <div className="absolute inset-y-16 right-10 w-40 rounded-full bg-[#feba02]/20 blur-3xl" />
+
+              <div className="rounded-[2rem] border border-white/10 bg-white/5 p-4 shadow-[0_30px_80px_rgba(0,0,0,0.18)] backdrop-blur-sm">
+                <div className={cn(
+                  'rounded-[1.75rem] border p-5 shadow-2xl transition-all duration-700 transform-gpu bg-gradient-to-br',
+                  promoCards[promoIndex].accent,
+                  'translate-x-0 scale-100 opacity-100 shadow-black/20 animate-promo-float'
+                )}>
+                  {(() => {
+                    const card = promoCards[promoIndex];
+                    const Icon = card.icon;
+
+                    return (
+                      <>
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex items-center gap-3">
+                            <div className={cn(
+                              'flex h-12 w-12 items-center justify-center rounded-2xl text-white shadow-lg',
+                              promoIndex === 0 ? 'bg-[#feba02]' : promoIndex === 1 ? 'bg-[#0071c2]' : 'bg-[#0f766e]'
+                            )}>
+                              <Icon className="h-6 w-6" />
+                            </div>
+                            <div>
+                              <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500">
+                                {card.badge}
+                              </p>
+                              <h3 className="mt-1 text-xl font-black text-slate-900">{card.title}</h3>
+                            </div>
+                          </div>
+                          <span className="relative mt-1 flex h-3 w-3 items-center justify-center">
+                            <span className="absolute h-3 w-3 animate-ping rounded-full bg-[#feba02]/70" />
+                            <span className="relative h-3 w-3 rounded-full bg-[#feba02] shadow-[0_0_0_8px_rgba(254,186,2,0.12)]" />
+                          </span>
+                        </div>
+
+                        <p className="mt-4 max-w-sm text-sm leading-relaxed text-slate-600">
+                          {card.text}
+                        </p>
+
+                        <div className="mt-5 flex items-center justify-between gap-3">
+                          <button
+                            type="button"
+                            onClick={() => navigate('/login')}
+                            className="inline-flex items-center gap-2 rounded-xl bg-[#003580] px-4 py-2.5 text-sm font-bold text-white transition-all hover:bg-[#00295e] active:scale-95"
+                          >
+                            <LogIn className="h-4 w-4" />
+                            Login now
+                          </button>
+                          <span className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500">
+                            Save on 2 orders
+                          </span>
+                        </div>
+                      </>
+                    );
+                  })()}
+                </div>
+
+                <div className="mt-4 flex items-center justify-center gap-2">
+                  {promoCards.map((card, index) => (
+                    <button
+                      key={card.title}
+                      type="button"
+                      onClick={() => setPromoIndex(index)}
+                      aria-label={`Show promo card ${index + 1}`}
+                      className={cn(
+                        'h-2.5 rounded-full transition-all duration-300',
+                        index === promoIndex ? 'w-8 bg-[#feba02]' : 'w-2.5 bg-white/40 hover:bg-white/70'
+                      )}
+                    />
+                  ))}
+                </div>
+
+                <div className="mt-8 flex items-center justify-between rounded-2xl border border-white/20 bg-white/10 px-4 py-3 text-white shadow-[0_20px_50px_rgba(0,0,0,0.3)] backdrop-blur-md animate-pop-in">
+                  <div className="flex items-center gap-3">
+                    <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#feba02] text-white shadow-lg shadow-amber-400/40 animate-pulse">
+                      <BellRing className="h-5 w-5" />
+                    </span>
+                    <div>
+                      <p className="text-[10px] font-black uppercase tracking-[0.35em] text-[#feba02]">Advertisement</p>
+                      <p className="text-sm font-bold">Sign up today and grab 15% OFF!</p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => navigate('/login')}
+                    className="rounded-xl bg-[#feba02] px-4 py-2 text-xs font-black uppercase tracking-wider text-[#003580] transition-all hover:bg-white hover:scale-105 active:scale-95 shadow-lg"
+                  >
+                    Claim Now
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </section>
