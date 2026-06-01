@@ -63,12 +63,14 @@ const categories: Array<any> = [
   { id: 'cat-1', name: 'Maintenance', slug: 'maintenance', active: true, createdAt: now(), updatedAt: now() },
   { id: 'cat-2', name: 'Repairs', slug: 'repairs', active: true, createdAt: now(), updatedAt: now() },
   { id: 'cat-3', name: 'Diagnostics', slug: 'diagnostics', active: true, createdAt: now(), updatedAt: now() },
+  { id: 'cat-4', name: 'Electrical', slug: 'electrical', active: true, createdAt: now(), updatedAt: now() },
 ];
 
 const services: Array<any> = [
-  { id: 's1', vendorId: 'vendor-1', garageId: 'garage-1', categoryId: 'cat-1', name: 'Brake Repair', price: 120, durationMinutes: 90, active: true, createdAt: now(), updatedAt: now() },
-  { id: 's2', vendorId: 'vendor-1', garageId: 'garage-1', categoryId: 'cat-1', name: 'Oil Change', price: 49, durationMinutes: 30, active: true, createdAt: now(), updatedAt: now() },
-  { id: 's3', vendorId: 'vendor-1', garageId: 'garage-2', categoryId: 'cat-2', name: 'General Service', price: 189, durationMinutes: 120, active: true, createdAt: now(), updatedAt: now() },
+  { id: 's1', vendorId: 'vendor-1', garageId: 'garage-1', categoryId: 'cat-2', name: 'Brake Repair', description: 'Replacement of brake pads and inspection of rotors.', price: 120, durationMinutes: 90, active: true, createdAt: now(), updatedAt: now() },
+  { id: 's2', vendorId: 'vendor-1', garageId: 'garage-1', categoryId: 'cat-1', name: 'Oil Change', description: 'Oil change, filter replacement, and fluid top-up.', price: 49, durationMinutes: 30, active: true, createdAt: now(), updatedAt: now() },
+  { id: 's3', vendorId: 'vendor-1', garageId: 'garage-2', categoryId: 'cat-1', name: 'General Service', description: 'Multi-point inspection and preventative maintenance.', price: 189, durationMinutes: 120, active: true, createdAt: now(), updatedAt: now() },
+  { id: 's4', vendorId: 'vendor-1', garageId: 'garage-2', categoryId: 'cat-4', name: 'Battery Replacement', description: 'Battery test and replacement with warranty.', price: 150, durationMinutes: 30, active: true, createdAt: now(), updatedAt: now() },
 ];
 
 const bookings: BookingRecord[] = [
@@ -91,6 +93,9 @@ const wishlist: Array<any> = [{ id: 'wish-1', customerEmail: 'john@example.com',
 const kyvDocuments: Array<any> = [{ id: 'kyv-1', vendorId: 'vendor-1', documentType: 'trade-license', fileName: 'license.pdf', status: 'approved' }];
 const notifications: Array<any> = [];
 const resetTokens: Array<any> = [];
+const supportTickets: Array<any> = [{ id: 'ticket-1', subject: 'Sample ticket', message: 'Customer needs help with a booking.', status: 'open', priority: 'medium', createdAt: now(), updatedAt: now() }];
+const cmsPages: Array<any> = [{ id: 'cms-home', slug: 'home', title: 'Home', content: '<h1>Home</h1>', status: 'published', createdAt: now(), updatedAt: now() }];
+const pricingRules: Array<any> = [{ id: 'price-1', vendorId: 'vendor-1', categoryId: 'cat-1', name: 'Weekend demand uplift', ruleType: 'percentage', payload: { percent: 10, days: ['Saturday', 'Sunday'] }, active: true, createdAt: now(), updatedAt: now() }];
 const chats: Array<any> = [
   { id: 1, name: 'John Doe', lastMessage: 'Is my car ready for pickup?', time: '10:30 AM', unread: 2, image: 'https://i.pravatar.cc/150?u=john' },
   { id: 2, name: 'Sarah Smith', lastMessage: 'Thank you for the quick service!', time: 'Yesterday', unread: 0, image: 'https://i.pravatar.cc/150?u=sarah' },
@@ -111,7 +116,7 @@ const safeUser = (user: UserRecord | undefined) => {
   return rest;
 };
 
-const issueToken = (user: UserRecord) => jwt.sign({ sub: user.id, role: user.role, email: user.email }, JWT_SECRET, { expiresIn: '7d' });
+const issueToken = (user: UserRecord) => jwt.sign({ id: user.id, sub: user.id, role: user.role, email: user.email }, JWT_SECRET, { expiresIn: '7d' });
 
 const userFromToken = (req: any) => {
   const header = req.headers.authorization || '';
@@ -137,6 +142,40 @@ const findUserByEmail = (email: string, role?: Role) => users.find((u) => u.emai
 const matches = (item: any, q: string) => {
   const haystack = [item.name, item.businessName, item.location, item.city, item.description, item.service, item.title].filter(Boolean).join(' ').toLowerCase();
   return haystack.includes(q.toLowerCase());
+};
+
+const slugify = (value: string) => value.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+
+const resolveVendorId = (req: any) => {
+  const explicitVendorId = String(req.query.vendorId || req.body?.vendorId || '').trim();
+  if (explicitVendorId) return explicitVendorId;
+  if (req.user?.role === 'vendor') {
+    return vendors.find((v) => v.userId === req.user.id)?.id || req.user.id;
+  }
+  return 'vendor-1';
+};
+
+const decorateService = (service: any) => ({
+  ...service,
+  category: categories.find((category) => category.id === service.categoryId)?.name || 'Uncategorized',
+  duration: service.duration || `${service.durationMinutes || 60} mins`,
+  status: service.active === false ? 'inactive' : 'active',
+});
+
+const clearBookingCache = async (booking: Partial<BookingRecord>) => {
+  await Promise.allSettled([
+    booking.vendorId ? cacheDel(`bookings:vendor:${booking.vendorId}`) : Promise.resolve(),
+    booking.email ? cacheDel(`bookings:customer:${booking.email}`) : Promise.resolve(),
+    cacheDel('bookings:all'),
+  ]);
+};
+
+const clearServiceCache = async (service?: any) => {
+  await Promise.allSettled([
+    cacheDel('services:::'),
+    service?.vendorId ? cacheDel(`services::${service.vendorId}:`) : Promise.resolve(),
+    service?.garageId ? cacheDel(`services:::${service.garageId}`) : Promise.resolve(),
+  ]);
 };
 
 const buildAvailability = (vendorId: string, date: string) => {
@@ -239,10 +278,58 @@ router.get('/services', async (req, res) => {
     if (vendorId) filtered = filtered.filter((s) => s.vendorId === vendorId);
     if (garageId) filtered = filtered.filter((s) => s.garageId === garageId);
     if (query) filtered = filtered.filter((s) => matches(s, query));
-    return filtered;
+    return filtered.map(decorateService);
   });
 
   res.json(result);
+});
+
+router.post('/services', requireRole('vendor', 'admin'), async (req: any, res) => {
+  const vendorId = resolveVendorId(req);
+  const name = String(req.body.name || '').trim();
+  if (!name) return res.status(400).json({ message: 'Service name is required' });
+
+  const service = {
+    id: uid('svc'),
+    vendorId,
+    garageId: req.body.garageId || garages.find((g) => g.vendorId === vendorId)?.id || '',
+    categoryId: req.body.categoryId || categories.find((c) => c.slug === slugify(req.body.category || ''))?.id || '',
+    name,
+    description: req.body.description || '',
+    price: Number(req.body.price || 0),
+    durationMinutes: Number(req.body.durationMinutes || req.body.duration || 60),
+    active: req.body.active !== false && req.body.status !== 'inactive',
+    createdAt: now(),
+    updatedAt: now(),
+  };
+  services.push(service);
+  await clearServiceCache(service);
+  res.status(201).json(decorateService(service));
+});
+
+router.patch('/services/:id', requireRole('vendor', 'admin'), async (req, res) => {
+  const service = services.find((s) => s.id === req.params.id);
+  if (!service) return res.status(404).json({ message: 'Service not found' });
+
+  const categoryId = req.body.categoryId || categories.find((c) => c.slug === slugify(req.body.category || ''))?.id;
+  Object.assign(service, {
+    ...req.body,
+    categoryId: categoryId || service.categoryId,
+    price: req.body.price === undefined ? service.price : Number(req.body.price),
+    durationMinutes: req.body.durationMinutes === undefined && req.body.duration === undefined ? service.durationMinutes : Number(req.body.durationMinutes || req.body.duration),
+    active: req.body.status === 'inactive' ? false : req.body.status === 'active' ? true : req.body.active ?? service.active,
+    updatedAt: now(),
+  });
+  await clearServiceCache(service);
+  res.json(decorateService(service));
+});
+
+router.delete('/services/:id', requireRole('vendor', 'admin'), async (req, res) => {
+  const index = services.findIndex((s) => s.id === req.params.id);
+  if (index === -1) return res.status(404).json({ message: 'Service not found' });
+  const [removed] = services.splice(index, 1);
+  await clearServiceCache(removed);
+  res.json(decorateService(removed));
 });
 
 router.get('/garages', async (req, res) => {
@@ -291,7 +378,7 @@ router.post('/bookings', async (req, res) => {
   const booking: BookingRecord = { id: uid('BK'), vendorId, garageId, serviceId: req.body.serviceId || '', email, phone: phone || '', customer: customer || `${req.body.firstName || ''} ${req.body.lastName || ''}`.trim() || 'Customer', car: carYear && carModel ? `${carModel} (${carYear})` : req.body.car || 'Vehicle', license: license || '', service, time, date, status: 'Pending', price: Number(price || 0), createdAt: now(), updatedAt: now() };
   bookings.unshift(booking);
 
-  await Promise.allSettled([cacheDel(`bookings:vendor:${vendorId}`), cacheDel(`bookings:customer:${email}`)]);
+  await clearBookingCache(booking);
   notifications.unshift({ id: uid('notif'), userId: email, type: 'booking_created', title: 'Booking created', body: `Booking ${booking.id} is now pending.`, read: false, createdAt: now(), metadata: { bookingId: booking.id } });
 
   res.status(201).json(booking);
@@ -303,14 +390,15 @@ router.get('/bookings/:id', (req, res) => {
   res.json(booking);
 });
 
-router.patch('/bookings/:id', (req, res) => {
+router.patch('/bookings/:id', async (req, res) => {
   const booking = bookings.find((b) => b.id === req.params.id);
   if (!booking) return res.status(404).json({ message: 'Booking not found' });
   Object.assign(booking, req.body, { updatedAt: now() });
+  await clearBookingCache(booking);
   res.json(booking);
 });
 
-router.post('/bookings/:id/cancel', (req, res) => {
+router.post('/bookings/:id/cancel', async (req, res) => {
   const booking = bookings.find((b) => b.id === req.params.id);
   if (!booking) return res.status(404).json({ message: 'Booking not found' });
   booking.status = 'Cancelled';
@@ -322,16 +410,18 @@ router.post('/bookings/:id/cancel', (req, res) => {
     payment.refundAmount = payment.amount;
     payment.updatedAt = now();
   }
+  await clearBookingCache(booking);
   res.json({ message: 'Booking cancelled', booking, refund: payment ? { amount: payment.refundAmount, status: payment.status } : null });
 });
 
-router.post('/bookings/:id/reschedule', (req, res) => {
+router.post('/bookings/:id/reschedule', async (req, res) => {
   const booking = bookings.find((b) => b.id === req.params.id);
   if (!booking) return res.status(404).json({ message: 'Booking not found' });
   booking.date = req.body.date || booking.date;
   booking.time = req.body.time || booking.time;
   booking.status = req.body.status || 'Confirmed';
   booking.updatedAt = now();
+  await clearBookingCache(booking);
   res.json({ message: 'Booking rescheduled', booking });
 });
 
@@ -378,6 +468,48 @@ router.patch('/notifications/:id/read', (req, res) => {
   notification.read = true;
   notification.readAt = now();
   res.json(notification);
+});
+
+router.get('/categories', (_req, res) => {
+  res.json(categories.map((category) => ({
+    ...category,
+    services: services.filter((service) => service.categoryId === category.id).length,
+    status: category.active === false ? 'inactive' : 'active',
+  })));
+});
+
+router.post('/categories', requireRole('admin'), (req, res) => {
+  const name = String(req.body.name || '').trim();
+  if (!name) return res.status(400).json({ message: 'Category name is required' });
+  const slug = req.body.slug ? slugify(req.body.slug) : slugify(name);
+  if (categories.some((category) => category.slug === slug)) return res.status(409).json({ message: 'Category already exists' });
+  const category = { id: uid('cat'), name, slug, description: req.body.description || '', active: req.body.active !== false && req.body.status !== 'inactive', createdAt: now(), updatedAt: now() };
+  categories.push(category);
+  res.status(201).json({ ...category, services: 0, status: category.active ? 'active' : 'inactive' });
+});
+
+router.patch('/categories/:id', requireRole('admin'), (req, res) => {
+  const category = categories.find((c) => c.id === req.params.id);
+  if (!category) return res.status(404).json({ message: 'Category not found' });
+  const nextSlug = req.body.slug ? slugify(req.body.slug) : undefined;
+  if (nextSlug && categories.some((c) => c.id !== category.id && c.slug === nextSlug)) return res.status(409).json({ message: 'Category slug already exists' });
+  Object.assign(category, {
+    ...req.body,
+    slug: nextSlug || category.slug,
+    active: req.body.status === 'inactive' ? false : req.body.status === 'active' ? true : req.body.active ?? category.active,
+    updatedAt: now(),
+  });
+  res.json({ ...category, services: services.filter((service) => service.categoryId === category.id).length, status: category.active ? 'active' : 'inactive' });
+});
+
+router.delete('/categories/:id', requireRole('admin'), (req, res) => {
+  const index = categories.findIndex((c) => c.id === req.params.id);
+  if (index === -1) return res.status(404).json({ message: 'Category not found' });
+  const [removed] = categories.splice(index, 1);
+  services.forEach((service) => {
+    if (service.categoryId === removed.id) service.categoryId = '';
+  });
+  res.json(removed);
 });
 
 router.get('/reviews', (req, res) => {
@@ -429,18 +561,119 @@ router.delete('/wishlist', (req, res) => {
 router.get('/admin/users', requireRole('admin'), (_req, res) => res.json(users.map(safeUser)));
 router.get('/admin/vendors', requireRole('admin'), (_req, res) => res.json(vendors));
 router.get('/admin/bookings', requireRole('admin'), (_req, res) => res.json(bookings));
-router.get('/admin/categories', requireRole('admin'), (_req, res) => res.json(categories));
+router.get('/admin/categories', requireRole('admin'), (_req, res) => res.json(categories.map((category) => ({ ...category, services: services.filter((service) => service.categoryId === category.id).length, status: category.active ? 'active' : 'inactive' }))));
 router.get('/admin/promotions', requireRole('admin'), (_req, res) => res.json(promotions));
-router.get('/admin/cms', requireRole('admin'), (_req, res) => res.json([{ id: 'cms-home', slug: 'home', title: 'Home', content: '<h1>Home</h1>', status: 'published' }]));
+router.get('/admin/cms', requireRole('admin'), (_req, res) => res.json(cmsPages));
 router.get('/admin/reviews', requireRole('admin'), (_req, res) => res.json(reviews));
-router.get('/admin/support', requireRole('admin'), (_req, res) => res.json([{ id: 'ticket-1', subject: 'Sample ticket', status: 'open', priority: 'medium' }]));
+router.get('/admin/support', requireRole('admin'), (_req, res) => res.json(supportTickets));
 router.get('/admin/payments', requireRole('admin'), (_req, res) => res.json(payments));
 router.get('/admin/settings', requireRole('admin'), (_req, res) => res.json(settings));
 router.get('/admin/kyv', requireRole('admin'), (_req, res) => res.json(kyvDocuments));
+router.get('/admin/pricing', requireRole('admin'), (_req, res) => res.json(pricingRules));
+
+router.post('/admin/users', requireRole('admin'), async (req, res) => {
+  const { email, password = 'password123', role = 'customer', fullName = '', phone = '', status = 'active' } = req.body;
+  if (!email) return res.status(400).json({ message: 'Email is required' });
+  if (findUserByEmail(email)) return res.status(409).json({ message: 'Email already registered' });
+  const user: UserRecord = { id: uid('user'), email, passwordHash: await bcrypt.hash(password, 10), role, fullName, phone, status, createdAt: now(), updatedAt: now() };
+  users.push(user);
+  res.status(201).json(safeUser(user));
+});
+
+router.patch('/admin/users/:id', requireRole('admin'), (req, res) => {
+  const user = users.find((u) => u.id === req.params.id);
+  if (!user) return res.status(404).json({ message: 'User not found' });
+  Object.assign(user, req.body, { updatedAt: now() });
+  res.json(safeUser(user));
+});
+
+router.delete('/admin/users/:id', requireRole('admin'), (req, res) => {
+  const index = users.findIndex((u) => u.id === req.params.id);
+  if (index === -1) return res.status(404).json({ message: 'User not found' });
+  const [removed] = users.splice(index, 1);
+  res.json(safeUser(removed));
+});
+
+router.post('/admin/vendors', requireRole('admin'), (req, res) => {
+  const businessName = String(req.body.businessName || req.body.name || '').trim();
+  if (!businessName) return res.status(400).json({ message: 'Business name is required' });
+  const vendor = { id: uid('vendor'), userId: req.body.userId || '', name: businessName, businessName, rating: Number(req.body.rating || 0), active: req.body.active !== false, verified: Boolean(req.body.verified), phone: req.body.phone || '', email: req.body.email || '', location: req.body.location || '', description: req.body.description || '', createdAt: now(), updatedAt: now() };
+  vendors.push(vendor);
+  res.status(201).json(vendor);
+});
+
+router.patch('/admin/vendors/:id', requireRole('admin'), (req, res) => {
+  const vendor = vendors.find((v) => v.id === req.params.id);
+  if (!vendor) return res.status(404).json({ message: 'Vendor not found' });
+  Object.assign(vendor, req.body, { updatedAt: now() });
+  res.json(vendor);
+});
+
+router.delete('/admin/vendors/:id', requireRole('admin'), (req, res) => {
+  const index = vendors.findIndex((v) => v.id === req.params.id);
+  if (index === -1) return res.status(404).json({ message: 'Vendor not found' });
+  const [removed] = vendors.splice(index, 1);
+  res.json(removed);
+});
 
 router.patch('/admin/settings', requireRole('admin'), (req, res) => {
   Object.assign(settings, req.body, { updatedAt: now() });
   res.json(settings);
+});
+
+router.post('/admin/cms', requireRole('admin'), (req, res) => {
+  const title = String(req.body.title || '').trim();
+  if (!title) return res.status(400).json({ message: 'Page title is required' });
+  const page = { id: uid('cms'), slug: req.body.slug ? slugify(req.body.slug) : slugify(title), title, content: req.body.content || '', status: req.body.status || 'draft', createdAt: now(), updatedAt: now() };
+  cmsPages.push(page);
+  res.status(201).json(page);
+});
+
+router.patch('/admin/cms/:id', requireRole('admin'), (req, res) => {
+  const page = cmsPages.find((p) => p.id === req.params.id || p.slug === req.params.id);
+  if (!page) return res.status(404).json({ message: 'Page not found' });
+  Object.assign(page, req.body, { slug: req.body.slug ? slugify(req.body.slug) : page.slug, updatedAt: now() });
+  res.json(page);
+});
+
+router.delete('/admin/cms/:id', requireRole('admin'), (req, res) => {
+  const index = cmsPages.findIndex((p) => p.id === req.params.id || p.slug === req.params.id);
+  if (index === -1) return res.status(404).json({ message: 'Page not found' });
+  const [removed] = cmsPages.splice(index, 1);
+  res.json(removed);
+});
+
+router.post('/admin/support', requireRole('admin'), (req, res) => {
+  const ticket = { id: uid('ticket'), subject: req.body.subject || 'Support request', message: req.body.message || '', status: req.body.status || 'open', priority: req.body.priority || 'medium', userId: req.body.userId || '', assignedTo: req.body.assignedTo || '', createdAt: now(), updatedAt: now() };
+  supportTickets.unshift(ticket);
+  res.status(201).json(ticket);
+});
+
+router.patch('/admin/support/:id', requireRole('admin'), (req, res) => {
+  const ticket = supportTickets.find((t) => t.id === req.params.id);
+  if (!ticket) return res.status(404).json({ message: 'Support ticket not found' });
+  Object.assign(ticket, req.body, { updatedAt: now() });
+  res.json(ticket);
+});
+
+router.post('/admin/pricing', requireRole('admin'), (req, res) => {
+  const rule = { id: uid('price'), vendorId: req.body.vendorId || '', categoryId: req.body.categoryId || '', name: req.body.name || 'Pricing rule', ruleType: req.body.ruleType || req.body.rule_type || 'fixed', payload: req.body.payload || {}, active: req.body.active !== false, createdAt: now(), updatedAt: now() };
+  pricingRules.push(rule);
+  res.status(201).json(rule);
+});
+
+router.patch('/admin/pricing/:id', requireRole('admin'), (req, res) => {
+  const rule = pricingRules.find((p) => p.id === req.params.id);
+  if (!rule) return res.status(404).json({ message: 'Pricing rule not found' });
+  Object.assign(rule, req.body, { updatedAt: now() });
+  res.json(rule);
+});
+
+router.delete('/admin/pricing/:id', requireRole('admin'), (req, res) => {
+  const index = pricingRules.findIndex((p) => p.id === req.params.id);
+  if (index === -1) return res.status(404).json({ message: 'Pricing rule not found' });
+  const [removed] = pricingRules.splice(index, 1);
+  res.json(removed);
 });
 
 router.patch('/admin/kyv/:id/approve', requireRole('admin'), (req, res) => {
@@ -505,32 +738,34 @@ router.post('/customer/bookings/:id/favorite', requireRole('customer', 'admin'),
 });
 
 router.get('/vendor/profile', requireRole('vendor', 'admin'), (req: any, res) => {
-  const vendor = vendors.find((v) => v.userId === req.user.id || v.id === String(req.query.vendorId || ''));
+  const vendorId = resolveVendorId(req);
+  const vendor = vendors.find((v) => v.userId === req.user.id || v.id === vendorId);
   if (!vendor) return res.status(404).json({ message: 'Vendor not found' });
   res.json(vendor);
 });
 
 router.patch('/vendor/profile', requireRole('vendor', 'admin'), (req: any, res) => {
-  const vendor = vendors.find((v) => v.userId === req.user.id || v.id === req.body.vendorId);
+  const vendorId = resolveVendorId(req);
+  const vendor = vendors.find((v) => v.userId === req.user.id || v.id === vendorId);
   if (!vendor) return res.status(404).json({ message: 'Vendor not found' });
   Object.assign(vendor, req.body, { updatedAt: now() });
   res.json(vendor);
 });
 
 router.get('/vendor/bookings', requireRole('vendor', 'admin'), (req: any, res) => {
-  const vendorId = String(req.query.vendorId || req.user.id);
+  const vendorId = resolveVendorId(req);
   res.json(bookings.filter((b) => b.vendorId === vendorId));
 });
 
 router.get('/vendor/calendar', requireRole('vendor', 'admin'), (req: any, res) => {
-  const vendorId = String(req.query.vendorId || req.user.id);
+  const vendorId = resolveVendorId(req);
   const date = String(req.query.date || '');
   const data = bookings.filter((b) => b.vendorId === vendorId && (!date || b.date === date));
   res.json({ vendorId, date, bookings: data, availability: buildAvailability(vendorId, date || new Date().toDateString()) });
 });
 
 router.get('/vendor/earnings', requireRole('vendor', 'admin'), (req: any, res) => {
-  const vendorId = String(req.query.vendorId || req.user.id);
+  const vendorId = resolveVendorId(req);
   const vendorBookings = bookings.filter((b) => b.vendorId === vendorId);
   const revenue = vendorBookings.reduce((sum, b) => sum + (Number(b.price) || 0), 0);
   const paid = payments.filter((p) => vendorBookings.some((b) => b.id === p.bookingId));
@@ -538,17 +773,63 @@ router.get('/vendor/earnings', requireRole('vendor', 'admin'), (req: any, res) =
 });
 
 router.get('/vendor/services', requireRole('vendor', 'admin'), (req: any, res) => {
-  const vendorId = String(req.query.vendorId || req.user.id);
-  res.json(services.filter((s) => s.vendorId === vendorId));
+  const vendorId = resolveVendorId(req);
+  res.json(services.filter((s) => s.vendorId === vendorId).map(decorateService));
+});
+
+router.post('/vendor/services', requireRole('vendor', 'admin'), async (req: any, res) => {
+  const vendorId = resolveVendorId(req);
+  const name = String(req.body.name || '').trim();
+  if (!name) return res.status(400).json({ message: 'Service name is required' });
+  const service = {
+    id: uid('svc'),
+    vendorId,
+    garageId: req.body.garageId || garages.find((g) => g.vendorId === vendorId)?.id || '',
+    categoryId: req.body.categoryId || categories.find((c) => c.slug === slugify(req.body.category || ''))?.id || '',
+    name,
+    description: req.body.description || '',
+    price: Number(req.body.price || 0),
+    durationMinutes: Number(req.body.durationMinutes || req.body.duration || 60),
+    active: req.body.active !== false && req.body.status !== 'inactive',
+    createdAt: now(),
+    updatedAt: now(),
+  };
+  services.push(service);
+  await clearServiceCache(service);
+  res.status(201).json(decorateService(service));
+});
+
+router.patch('/vendor/services/:id', requireRole('vendor', 'admin'), async (req, res) => {
+  const service = services.find((s) => s.id === req.params.id);
+  if (!service) return res.status(404).json({ message: 'Service not found' });
+  const categoryId = req.body.categoryId || categories.find((c) => c.slug === slugify(req.body.category || ''))?.id;
+  Object.assign(service, {
+    ...req.body,
+    categoryId: categoryId || service.categoryId,
+    price: req.body.price === undefined ? service.price : Number(req.body.price),
+    durationMinutes: req.body.durationMinutes === undefined && req.body.duration === undefined ? service.durationMinutes : Number(req.body.durationMinutes || req.body.duration),
+    active: req.body.status === 'inactive' ? false : req.body.status === 'active' ? true : req.body.active ?? service.active,
+    updatedAt: now(),
+  });
+  await clearServiceCache(service);
+  res.json(decorateService(service));
+});
+
+router.delete('/vendor/services/:id', requireRole('vendor', 'admin'), async (req, res) => {
+  const index = services.findIndex((s) => s.id === req.params.id);
+  if (index === -1) return res.status(404).json({ message: 'Service not found' });
+  const [removed] = services.splice(index, 1);
+  await clearServiceCache(removed);
+  res.json(decorateService(removed));
 });
 
 router.get('/vendor/staff', requireRole('vendor', 'admin'), (req: any, res) => {
-  const vendorId = String(req.query.vendorId || req.user.id);
+  const vendorId = resolveVendorId(req);
   res.json(staff.filter((s) => s.vendorId === vendorId));
 });
 
 router.post('/vendor/staff', requireRole('vendor', 'admin'), (req: any, res) => {
-  const entry = { id: uid('staff'), vendorId: req.user.id, ...req.body, active: req.body.active !== false, createdAt: now(), updatedAt: now() };
+  const entry = { id: uid('staff'), vendorId: resolveVendorId(req), ...req.body, active: req.body.active !== false, createdAt: now(), updatedAt: now() };
   staff.push(entry);
   res.status(201).json(entry);
 });
@@ -568,12 +849,12 @@ router.delete('/vendor/staff/:id', requireRole('vendor', 'admin'), (req, res) =>
 });
 
 router.get('/vendor/promotions', requireRole('vendor', 'admin'), (req: any, res) => {
-  const vendorId = String(req.query.vendorId || req.user.id);
+  const vendorId = resolveVendorId(req);
   res.json(promotions.filter((p) => p.vendorId === vendorId));
 });
 
 router.post('/vendor/promotions', requireRole('vendor', 'admin'), (req: any, res) => {
-  const entry = { id: uid('promo'), vendorId: req.user.id, ...req.body, createdAt: now(), updatedAt: now() };
+  const entry = { id: uid('promo'), vendorId: resolveVendorId(req), ...req.body, createdAt: now(), updatedAt: now() };
   promotions.push(entry);
   res.status(201).json(entry);
 });
@@ -593,12 +874,12 @@ router.delete('/vendor/promotions/:id', requireRole('vendor', 'admin'), (req, re
 });
 
 router.get('/vendor/kyv', requireRole('vendor', 'admin'), (req: any, res) => {
-  const vendorId = String(req.query.vendorId || req.user.id);
+  const vendorId = resolveVendorId(req);
   res.json(kyvDocuments.filter((k) => k.vendorId === vendorId));
 });
 
 router.post('/vendor/kyv', requireRole('vendor', 'admin'), (req: any, res) => {
-  const entry = { id: uid('kyv'), vendorId: req.user.id, ...req.body, status: 'pending', createdAt: now(), updatedAt: now() };
+  const entry = { id: uid('kyv'), vendorId: resolveVendorId(req), ...req.body, status: 'pending', createdAt: now(), updatedAt: now() };
   kyvDocuments.push(entry);
   res.status(201).json(entry);
 });
