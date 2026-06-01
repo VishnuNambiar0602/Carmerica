@@ -92,6 +92,8 @@ create table if not exists payments (
   amount numeric(12,2) not null default 0,
   currency text not null default 'AED',
   status text not null default 'pending',
+  provider text,
+  provider_payment_id text,
   refund_amount numeric(12,2) not null default 0,
   metadata jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default now(),
@@ -171,9 +173,13 @@ create table if not exists kyv_documents (
   document_type text not null,
   file_name text not null,
   file_url text,
+  file_hash text,
+  file_size integer not null default 0,
+  mime_type text,
   status text not null default 'pending',
   reviewed_by text references users(id) on delete set null,
   reviewed_at timestamptz,
+  review_note text,
   metadata jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -221,3 +227,47 @@ create table if not exists pricing_rules (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+create table if not exists password_reset_tokens (
+  id text primary key,
+  user_id text references users(id) on delete cascade,
+  token_hash text not null unique,
+  expires_at timestamptz not null,
+  used_at timestamptz,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists platform_settings (
+  key text primary key,
+  value jsonb not null default '{}'::jsonb,
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists audit_logs (
+  id text primary key,
+  actor_id text references users(id) on delete set null,
+  actor_email text,
+  actor_role text,
+  action text not null,
+  entity_type text not null,
+  entity_id text,
+  ip_address text,
+  user_agent text,
+  before_state jsonb,
+  after_state jsonb,
+  created_at timestamptz not null default now()
+);
+
+alter table payments add column if not exists provider text;
+alter table payments add column if not exists provider_payment_id text;
+alter table kyv_documents add column if not exists file_hash text;
+alter table kyv_documents add column if not exists file_size integer not null default 0;
+alter table kyv_documents add column if not exists mime_type text;
+alter table kyv_documents add column if not exists review_note text;
+
+create index if not exists idx_users_email_role on users (lower(email), role);
+create index if not exists idx_bookings_vendor_date on bookings (vendor_id, scheduled_date);
+create index if not exists idx_bookings_customer_email on bookings (lower(customer_email));
+create index if not exists idx_payments_provider_payment_id on payments (provider_payment_id);
+create index if not exists idx_kyv_documents_vendor_status on kyv_documents (vendor_id, status);
+create index if not exists idx_audit_logs_entity on audit_logs (entity_type, entity_id, created_at desc);

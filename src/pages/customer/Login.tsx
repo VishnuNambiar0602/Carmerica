@@ -15,13 +15,16 @@ const Login = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const res = await fetch('/api/auth/login', {
+      const res = await fetch(isLogin ? '/api/auth/login' : '/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: formData.email, password: formData.password, role: 'customer' })
+        body: JSON.stringify({ email: formData.email, password: formData.password, fullName: formData.fullName, role: 'customer' })
       });
       const data = await res.json();
       if (res.ok) {
+        localStorage.setItem('authToken', data.token);
+        localStorage.setItem('userRole', 'customer');
+        localStorage.setItem('userEmail', formData.email);
         navigate('/');
       } else {
         alert(data.message || 'Login failed');

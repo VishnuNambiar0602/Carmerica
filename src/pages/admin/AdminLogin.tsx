@@ -10,11 +10,32 @@ const AdminLogin = () => {
     password: '',
     mfaCode: ''
   });
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Simulate admin login
-    navigate('/admin/overview');
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+    try {
+      const res = await fetch('/api/admin/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: formData.email, password: formData.password, mfaCode: formData.mfaCode }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data.message || 'Admin login failed');
+        return;
+      }
+      localStorage.setItem('authToken', data.token);
+      localStorage.setItem('userRole', 'admin');
+      navigate('/admin/overview');
+    } catch (err) {
+      console.error(err);
+      alert('Network error');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -118,7 +139,7 @@ const AdminLogin = () => {
               type="submit"
               className="w-full flex justify-center py-4 px-4 border border-transparent rounded-lg shadow-lg text-sm font-bold text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-all transform hover:scale-[1.02] active:scale-[0.98]"
             >
-              Authenticate & Enter
+              {isSubmitting ? 'Authenticating...' : 'Authenticate & Enter'}
             </button>
           </div>
         </form>

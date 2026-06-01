@@ -6,11 +6,15 @@ import compression from 'compression';
 import rateLimit from 'express-rate-limit';
 import apiRoutes from './routes.js';
 import { errorHandler, requestLogger } from './middleware.js';
+import { assertProductionConfig } from './lib/config.js';
+import { bootstrapSystemAdmin } from './lib/bootstrap.js';
 import { getRedisClient } from './lib/redis.js';
+import { isDatabaseConfigured } from './lib/db.js';
 import { isSupabaseConfigured } from './lib/supabase.js';
 
 dotenv.config({ path: '.env.local', override: false });
 dotenv.config();
+assertProductionConfig();
 
 const app = express();
 const port = Number(process.env.PORT || 5000);
@@ -26,6 +30,7 @@ app.use(rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
 }));
+app.use('/api/payments/webhook/stripe', express.raw({ type: 'application/json', limit: '2mb' }));
 app.use(express.json({ limit: '2mb' }));
 app.use(express.urlencoded({ extended: true, limit: '2mb' }));
 app.use(requestLogger);
@@ -51,6 +56,7 @@ app.get('/health', async (_req, res) => {
     message: 'Server is running perfectly!',
     infrastructure: {
       supabaseConfigured: isSupabaseConfigured(),
+      databaseConfigured: isDatabaseConfigured(),
       redisConfigured: Boolean(process.env.REDIS_URL),
       redisHealthy,
     },
@@ -60,6 +66,8 @@ app.get('/health', async (_req, res) => {
 app.use(errorHandler);
 
 // Start server
+await bootstrapSystemAdmin();
+
 const server = app.listen(port, () => {
   console.log(`[Server]: Running at http://localhost:${port}`);
 });

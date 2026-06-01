@@ -20,6 +20,9 @@ const VendorLogin = () => {
       });
       const data = await res.json();
       if (res.ok) {
+        localStorage.setItem('authToken', data.token);
+        localStorage.setItem('userRole', 'vendor');
+        localStorage.setItem('userEmail', formData.email);
         navigate('/vendor/dashboard');
       } else {
         alert(data.message || 'Login failed');

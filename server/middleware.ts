@@ -1,5 +1,6 @@
 import type { NextFunction, Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
+import { getJwtSecret } from './lib/config.js';
 
 export type AppRole = 'customer' | 'vendor' | 'admin';
 
@@ -17,8 +18,6 @@ declare global {
   }
 }
 
-const JWT_SECRET = process.env.JWT_SECRET || 'carmerica-dev-secret';
-
 export function requestLogger(req: Request, res: Response, next: NextFunction) {
   const startedAt = Date.now();
   res.on('finish', () => {
@@ -35,7 +34,7 @@ export function authenticate(req: Request, res: Response, next: NextFunction) {
   }
 
   try {
-    const payload = jwt.verify(header.slice(7), JWT_SECRET) as AuthUser;
+    const payload = jwt.verify(header.slice(7), getJwtSecret()) as AuthUser;
     req.user = payload;
     next();
   } catch {

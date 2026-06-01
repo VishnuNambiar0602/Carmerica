@@ -7,6 +7,11 @@ import { GarageLocator, type UserLocation } from '../services/GarageLocator';
 import DirectionsView from './DirectionsView';
 import 'leaflet/dist/leaflet.css';
 
+const LeafletMapContainer = MapContainer as any;
+const LeafletTileLayer = TileLayer as any;
+const LeafletMarker = Marker as any;
+const LeafletCircleMarker = CircleMarker as any;
+
 interface GarageMapProps {
   onClose?: () => void;
   onGarageSelect?: (garage: Garage) => void;
@@ -138,12 +143,12 @@ export default function GarageMap({ onClose, onGarageSelect }: GarageMapProps) {
         {/* Map */}
         <div className="flex-1 rounded-lg overflow-hidden border border-gray-200">
           {userLocation && (
-            <MapContainer
+            <LeafletMapContainer
               center={[userLocation.lat, userLocation.lng]}
               zoom={9}
               style={{ height: '100%', width: '100%' }}
             >
-              <TileLayer
+              <LeafletTileLayer
                 url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                 attribution='&copy; OpenStreetMap contributors'
               />
@@ -152,7 +157,7 @@ export default function GarageMap({ onClose, onGarageSelect }: GarageMapProps) {
 
               {/* User Location */}
               {userLocation && (
-                <CircleMarker
+                <LeafletCircleMarker
                   center={[userLocation.lat, userLocation.lng]}
                   radius={10}
                   fillColor="#3b82f6"
@@ -169,12 +174,12 @@ export default function GarageMap({ onClose, onGarageSelect }: GarageMapProps) {
                       </p>
                     </div>
                   </Popup>
-                </CircleMarker>
+                </LeafletCircleMarker>
               )}
 
               {/* Garage Markers */}
               {CALIFORNIA_GARAGES.map((garage) => (
-                <Marker
+                <LeafletMarker
                   key={garage.id}
                   position={[garage.lat, garage.lng]}
                   icon={defaultIcon}
@@ -221,9 +226,9 @@ export default function GarageMap({ onClose, onGarageSelect }: GarageMapProps) {
                       </div>
                     </div>
                   </Popup>
-                </Marker>
+                </LeafletMarker>
               ))}
-            </MapContainer>
+            </LeafletMapContainer>
           )}
         </div>
 

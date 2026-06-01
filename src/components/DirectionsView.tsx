@@ -5,6 +5,11 @@ import { X, Navigation, Clock, MapPin, AlertCircle } from 'lucide-react';
 import type { Garage } from '../data/garages';
 import { GarageLocator } from '../services/GarageLocator';
 
+const LeafletMapContainer = MapContainer as any;
+const LeafletTileLayer = TileLayer as any;
+const LeafletMarker = Marker as any;
+const LeafletPolyline = Polyline as any;
+
 interface DirectionsViewProps {
   garage: Garage;
   userLocation: { lat: number; lng: number };
@@ -156,12 +161,12 @@ export default function DirectionsView({
               </div>
             </div>
           ) : (
-            <MapContainer
+            <LeafletMapContainer
               center={[userLocation.lat, userLocation.lng]}
               zoom={12}
               style={{ height: '100%', width: '100%' }}
             >
-              <TileLayer
+              <LeafletTileLayer
                 url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                 attribution='&copy; OpenStreetMap contributors'
               />
@@ -173,7 +178,7 @@ export default function DirectionsView({
 
               {/* Route Line */}
               {routeCoordinates.length > 0 && (
-                <Polyline
+                <LeafletPolyline
                   positions={routeCoordinates}
                   color="#16a34a"
                   weight={4}
@@ -183,15 +188,15 @@ export default function DirectionsView({
               )}
 
               {/* User Location */}
-              <Marker
+              <LeafletMarker
                 position={[userLocation.lat, userLocation.lng]}
                 icon={userMarkerIcon}
               >
                 <Popup>Your Location</Popup>
-              </Marker>
+              </LeafletMarker>
 
               {/* Garage Location */}
-              <Marker
+              <LeafletMarker
                 position={[garage.lat, garage.lng]}
                 icon={defaultIcon}
               >
@@ -201,8 +206,8 @@ export default function DirectionsView({
                     <p className="text-gray-600">{garage.address}</p>
                   </div>
                 </Popup>
-              </Marker>
-            </MapContainer>
+              </LeafletMarker>
+            </LeafletMapContainer>
           )}
         </div>
 
