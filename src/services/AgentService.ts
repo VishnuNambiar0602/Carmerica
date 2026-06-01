@@ -12,6 +12,7 @@ import {
   getBookingsByUserId,
   getGaragesByServiceType,
   getReviewsByGarageName,
+  getUserVehicles,
 } from './DatabaseTool';
 
 // ---------------------------------------------------------------------------
@@ -181,13 +182,19 @@ async function fetchDatabaseContext(
       return 'No garage mentioned.';
     }
     case 'maintenance': {
+      // Data Bridge for registered users
+      const vehicles = getUserVehicles(userId);
+      const vehicleContext = vehicles.length > 0 
+        ? `Customer's Registered Vehicles: ${JSON.stringify(vehicles, null, 2)}\n(Use this to provide high-precision maintenance advice.)`
+        : 'Customer has no registered vehicles (Guest). Suggest they register for smarter advice.';
+
       const serviceKeywords = ['oil change', 'brake', 'ac', 'general service', 'full service', 'electrical', 'tyre', 'engine'];
       const mentionedService = serviceKeywords.find((kw) => fullText.toLowerCase().includes(kw));
-      if (mentionedService) {
-        const garages = getGaragesByServiceType(mentionedService);
-        return garages.length === 0 ? `No garages for "${mentionedService}".` : `Garages offering "${mentionedService}":\n${JSON.stringify(garages, null, 2)}`;
-      }
-      return 'No specific service type detected.';
+      const serviceContext = mentionedService 
+        ? `\nGarages offering "${mentionedService}":\n${JSON.stringify(getGaragesByServiceType(mentionedService), null, 2)}`
+        : '\nNo specific service type detected yet.';
+      
+      return `${vehicleContext}${serviceContext}`;
     }
     default:
       return 'No context needed.';

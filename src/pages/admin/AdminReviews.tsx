@@ -1,14 +1,33 @@
-import React from 'react';
-import { Star, MessageSquare, Filter, Search, MoreVertical, ThumbsUp, ThumbsDown, Reply, ShieldCheck, Flag, Building2, User, CheckCircle2, AlertCircle, Edit2, Trash2 } from 'lucide-react';
+import React, { useState } from 'react';
+import { Star, MessageSquare, Filter, Search, MoreVertical, ThumbsUp, ThumbsDown, Reply, ShieldCheck, Flag, Building2, User, CheckCircle2, AlertCircle, Edit2, Trash2, ShieldAlert, Sparkles, Loader2, Info } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
 const AdminReviews = () => {
-  const reviews = [
-    { id: 1, user: 'John Doe', vendor: 'Elite Auto Care', rating: 5, date: '2 days ago', comment: 'Excellent service! The team at Elite Motors was very professional and transparent about the costs.', status: 'published' },
-    { id: 2, user: 'Sarah Smith', vendor: 'Precision Mechanics', rating: 4, date: '1 week ago', comment: 'Good experience, but the waiting lounge was a bit crowded. The brake repair was done perfectly though.', status: 'published' },
-    { id: 3, user: 'Mike Johnson', vendor: 'Elite Auto Care', rating: 2, date: '2 weeks ago', comment: 'The service took much longer than expected and the staff was quite rude when I asked for an update.', status: 'flagged' },
-    { id: 4, user: 'Emily Davis', vendor: 'The Garage Co.', rating: 5, date: '3 weeks ago', comment: 'Best garage in town! Highly recommended for any electrical issues.', status: 'published' },
-  ];
+  const [reviewsData, setReviewsData] = useState([
+    { id: 1, user: 'John Doe', vendor: 'Elite Auto Care', rating: 5, date: '2 days ago', comment: 'Excellent service! The team at Elite Motors was very professional and transparent about the costs.', status: 'published', aiAudit: null },
+    { id: 2, user: 'Sarah Smith', vendor: 'Precision Mechanics', rating: 4, date: '1 week ago', comment: 'Good experience, but the waiting lounge was a bit crowded. The brake repair was done perfectly though.', status: 'published', aiAudit: null },
+    { id: 3, user: 'Mike Johnson', vendor: 'Elite Auto Care', rating: 2, date: '2 weeks ago', comment: 'The service took much longer than expected and the staff was quite rude when I asked for an update.', status: 'flagged', aiAudit: null },
+    { id: 4, user: 'Emily Davis', vendor: 'The Garage Co.', rating: 5, date: '3 weeks ago', comment: 'Best garage in town! Highly recommended for any electrical issues.', status: 'published', aiAudit: null },
+  ]);
+
+  const [auditingId, setAuditingId] = useState<number | null>(null);
+
+  const runAiAudit = async (review: any) => {
+    setAuditingId(review.id);
+    try {
+      const response = await fetch('/api/ai/moderate-review', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rating: review.rating, comment: review.comment })
+      });
+      const audit = await response.json();
+      setReviewsData(prev => prev.map(r => r.id === review.id ? { ...r, aiAudit: audit } : r));
+    } catch (err) {
+      console.error('Audit failed', err);
+    } finally {
+      setAuditingId(null);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -78,7 +97,7 @@ const AdminReviews = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {reviews.map((review) => (
+              {reviewsData.map((review) => (
                 <tr key={review.id} className="hover:bg-gray-50 transition-colors">
                   <td className="px-6 py-4">
                     <div className="flex items-center">
@@ -101,6 +120,15 @@ const AdminReviews = () => {
                   </td>
                   <td className="px-6 py-4">
                     <p className="text-sm text-gray-600 line-clamp-2 max-w-xs">{review.comment}</p>
+                    {review.aiAudit && (
+                      <div className={cn(
+                        "mt-2 p-2 rounded-lg text-[10px] font-bold flex items-center gap-2",
+                        review.aiAudit.status === 'flagged' ? "bg-red-50 text-red-600 border border-red-100" : "bg-green-50 text-green-600 border border-green-100"
+                      )}>
+                        {review.aiAudit.status === 'flagged' ? <ShieldAlert className="h-3 w-3" /> : <ShieldCheck className="h-3 w-3" />}
+                        AI AUDIT: {review.aiAudit.status.toUpperCase()} {review.aiAudit.flagReason && `- ${review.aiAudit.flagReason}`}
+                      </div>
+                    )}
                   </td>
                   <td className="px-6 py-4">
                     <span className={cn(
@@ -111,11 +139,23 @@ const AdminReviews = () => {
                     </span>
                   </td>
                   <td className="px-6 py-4 text-right">
-                    <div className="flex justify-end gap-2">
-                      <button className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
+                    <div className="flex justify-end gap-2 text-gray-400">
+                      <button 
+                        onClick={() => runAiAudit(review)}
+                        disabled={auditingId === review.id}
+                        className="p-2 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors group"
+                        title="AI Integrity Audit"
+                      >
+                        {auditingId === review.id ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Sparkles className="h-4 w-4 group-hover:fill-current" />
+                        )}
+                      </button>
+                      <button className="p-2 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
                         <Edit2 className="h-4 w-4" />
                       </button>
-                      <button className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
+                      <button className="p-2 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
                         <Trash2 className="h-4 w-4" />
                       </button>
                     </div>

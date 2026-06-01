@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Car, 
   Camera, 
@@ -14,30 +14,96 @@ import {
   Zap, 
   Info,
   CheckCircle2,
-  Settings
+  Settings,
+  Activity,
+  Loader2
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
 const SmartGarage = () => {
-  const [activeVehicle, setActiveVehicle] = React.useState(0);
-  const [isUploading, setIsUploading] = React.useState(false);
-  const [identifiedPart, setIdentifiedPart] = React.useState<null | { name: string; confidence: number; oem: string }>(null);
+  const [activeVehicle, setActiveVehicle] = useState(0);
+  const [isUploading, setIsUploading] = useState(false);
+  const [isDiagnosing, setIsDiagnosing] = useState(false);
+  const [diagnosis, setDiagnosis] = useState<any>(null);
+  const [identifiedPart, setIdentifiedPart] = useState<null | { 
+    name: string; 
+    confidence: number; 
+    oem: string;
+    condition?: string;
+    vulnerability?: string;
+    keywords?: string[];
+  }>(null);
 
   const vehicles = [
-    { id: 1, make: 'Toyota', model: 'Camry', year: 2022, vin: '4T1BF1FKXNU******', mileage: '24,500 km', status: 'Healthy' },
-    { id: 2, make: 'Tesla', model: 'Model 3', year: 2023, vin: '5YJ3E1EBXPF******', mileage: '12,200 km', status: 'Service Due' }
+    { id: 1, make: 'Toyota', model: 'Camry', year: 2022, vin: '4T1BF1FKXNU******', mileage: 24500, status: 'Healthy', lastServiceDate: '2025-10-12', lastServiceType: 'Oil Change' },
+    { id: 2, make: 'Tesla', model: 'Model 3', year: 2023, vin: '5YJ3E1EBXPF******', mileage: 12200, status: 'Service Due', lastServiceDate: '2026-01-15', lastServiceType: 'Tire Rotation' }
   ];
 
-  const handleUpload = () => {
-    setIsUploading(true);
-    setTimeout(() => {
-      setIsUploading(false);
-      setIdentifiedPart({
-        name: 'Front Brake Pads',
-        confidence: 0.98,
-        oem: '04465-06150'
+  const handleDiagnose = async () => {
+    setIsDiagnosing(true);
+    const vehicle = vehicles[activeVehicle];
+    try {
+      const response = await fetch('/api/ai/predict-maintenance', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          make: vehicle.make,
+          model: vehicle.model,
+          year: vehicle.year,
+          mileage: vehicle.mileage,
+          lastServiceDate: vehicle.lastServiceDate,
+          lastServiceType: vehicle.lastServiceType
+        })
       });
-    }, 2000);
+      const data = await response.json();
+      setDiagnosis(data);
+    } catch (err) {
+      console.error('Diagnosis failed', err);
+    } finally {
+      setIsDiagnosing(false);
+    }
+  };
+
+  useEffect(() => {
+    // Re-diagnose when switching cars
+    setDiagnosis(null);
+  }, [activeVehicle]);
+
+  const handleUpload = () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.onchange = async (e: any) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+
+      setIsUploading(true);
+      
+      // Convert to base64
+      const reader = new FileReader();
+      reader.onloadend = async () => {
+        const base64String = (reader.result as string).split(',')[1];
+        
+        try {
+          const response = await fetch('/api/ai/identify-part', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+              image: base64String, 
+              mimeType: file.type 
+            })
+          });
+          const data = await response.json();
+          setIdentifiedPart(data);
+        } catch (error) {
+          console.error('Vision analysis failed', error);
+        } finally {
+          setIsUploading(false);
+        }
+      };
+      reader.readAsDataURL(file);
+    };
+    input.click();
   };
 
   return (
@@ -205,6 +271,27 @@ const SmartGarage = () => {
                       <div>
                         <h3 className="text-2xl font-bold text-gray-900">{identifiedPart.name}</h3>
                         <p className="text-sm text-gray-500 mt-1 font-mono">OEM: {identifiedPart.oem}</p>
+                        {identifiedPart.condition && (
+                          <div className="mt-3 flex items-center gap-2">
+                            <span className="text-xs font-bold uppercase tracking-wider text-gray-400">Condition:</span>
+                            <span className={cn(
+                              "text-xs font-bold px-2 py-0.5 rounded-full",
+                              identifiedPart.condition.toLowerCase().includes('worn') || identifiedPart.condition.toLowerCase().includes('damage')
+                                ? "bg-red-100 text-red-700"
+                                : "bg-green-100 text-green-700"
+                            )}>
+                              {identifiedPart.condition}
+                            </span>
+                          </div>
+                        )}
+                        {identifiedPart.vulnerability && (
+                          <div className="mt-4 p-4 bg-red-50 rounded-xl border border-red-100/50 flex items-start gap-3">
+                            <AlertCircle className="h-5 w-5 text-red-600 shrink-0 mt-0.5" />
+                            <p className="text-sm text-red-900 font-medium leading-relaxed">
+                              {identifiedPart.vulnerability}
+                            </p>
+                          </div>
+                        )}
                       </div>
 
                       <div className="space-y-3">
@@ -246,57 +333,105 @@ const SmartGarage = () => {
           </div>
 
           {/* AI Maintenance Builder */}
-          <div className="bg-white rounded-3xl border border-gray-100 shadow-xl p-8">
+          <div className="bg-white rounded-3xl border border-gray-100 shadow-xl p-8 mb-8">
             <div className="flex justify-between items-center mb-8">
               <div>
                 <h2 className="text-xl font-bold text-gray-900 flex items-center">
-                  <Zap className="h-5 w-5 mr-2 text-yellow-500 fill-current" />
-                  Smart Maintenance Bundles
+                  <Activity className="h-5 w-5 mr-2 text-red-500" />
+                  Predictive Health Scan
                 </h2>
-                <p className="text-sm text-gray-500 mt-1">AI-suggested kits for your specific vehicle mileage.</p>
+                <p className="text-sm text-gray-500 mt-1">AI-driven diagnostics based on your {vehicles[activeVehicle].make}'s mileage.</p>
               </div>
-              <span className="bg-red-50 text-red-600 px-3 py-1 rounded-full text-xs font-bold">Save up to 15%</span>
+              {!diagnosis && (
+                <button 
+                  onClick={handleDiagnose}
+                  disabled={isDiagnosing}
+                  className="flex items-center gap-2 bg-black text-white px-6 py-2 rounded-xl text-sm font-bold hover:bg-gray-800 disabled:opacity-50"
+                >
+                  {isDiagnosing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Zap className="h-4 w-4" />}
+                  Run AI Scan
+                </button>
+              )}
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="p-6 rounded-3xl border-2 border-red-600 bg-red-50/30 relative">
-                <div className="absolute -top-3 right-6 bg-red-600 text-white px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest">
-                  Recommended
-                </div>
-                <h4 className="font-bold text-gray-900 text-lg">25,000 km Service Kit</h4>
-                <p className="text-xs text-gray-500 mt-1">Everything you need for your next service.</p>
-                <ul className="mt-4 space-y-2">
-                  <li className="text-sm text-gray-700 flex items-center"><CheckCircle2 className="h-4 w-4 mr-2 text-green-500" /> Synthetic Oil (5L)</li>
-                  <li className="text-sm text-gray-700 flex items-center"><CheckCircle2 className="h-4 w-4 mr-2 text-green-500" /> Genuine Oil Filter</li>
-                  <li className="text-sm text-gray-700 flex items-center"><CheckCircle2 className="h-4 w-4 mr-2 text-green-500" /> Air Filter Replacement</li>
-                </ul>
-                <div className="mt-6 flex items-center justify-between">
-                  <div>
-                    <p className="text-xs text-gray-400 line-through">$450</p>
-                    <p className="text-xl font-bold text-gray-900">$385</p>
+            {diagnosis ? (
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                <div className="lg:col-span-2 space-y-6">
+                  <div className="p-6 rounded-3xl bg-gray-50 border border-gray-100">
+                    <div className="flex items-center justify-between mb-4">
+                      <p className="text-sm font-bold text-gray-900 uppercase tracking-wider">Expert Assessment</p>
+                      <span className={cn(
+                        "px-3 py-1 rounded-full text-xs font-bold uppercase",
+                        diagnosis.urgency === 'high' ? "bg-red-100 text-red-700" :
+                        diagnosis.urgency === 'medium' ? "bg-yellow-100 text-yellow-700" :
+                        "bg-green-100 text-green-700"
+                      )}>
+                        Urgency: {diagnosis.urgency}
+                      </span>
+                    </div>
+                    <p className="text-xl font-medium text-gray-900 leading-relaxed italic">
+                      "{diagnosis.expertAdvice}"
+                    </p>
+                    {diagnosis.vulnerabilityAlert && (
+                      <div className="mt-4 p-4 bg-red-50 rounded-2xl border border-red-100 flex items-start gap-3">
+                        <AlertCircle className="h-5 w-5 text-red-600 mt-0.5" />
+                        <p className="text-sm text-red-900 font-bold">{diagnosis.vulnerabilityAlert}</p>
+                      </div>
+                    )}
                   </div>
-                  <button className="bg-red-600 text-white px-4 py-2 rounded-xl text-sm font-bold hover:bg-red-700">Add Bundle</button>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {diagnosis.predictedNeeds.map((need: any, idx: number) => (
+                      <div key={idx} className="p-5 rounded-2xl border border-gray-100 bg-white hover:shadow-md transition-all">
+                        <div className="flex items-center gap-3 mb-3">
+                          <div className="p-2 bg-blue-50 rounded-lg text-blue-600">
+                            <Wrench className="h-5 w-5" />
+                          </div>
+                          <h4 className="font-bold text-gray-900">{need.item}</h4>
+                        </div>
+                        <p className="text-sm text-gray-500 mb-3">{need.reason}</p>
+                        <div className="flex items-center justify-between mt-auto pt-3 border-t border-gray-50">
+                          <span className="text-xs text-gray-400 font-medium">Estimated in:</span>
+                          <span className="text-sm font-bold text-blue-600">{need.milesRemaining} km</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-6">
+                  <div className="p-8 rounded-3xl bg-black text-white flex flex-col items-center justify-center text-center relative overflow-hidden">
+                    <div className="absolute top-0 right-0 p-4 opacity-10">
+                      <Activity className="h-16 w-16" />
+                    </div>
+                    <p className="text-xs uppercase tracking-[0.2em] font-bold text-gray-400 mb-2">Engine Health</p>
+                    <div className="text-6xl font-black mb-2">{diagnosis.engineHealthScore}%</div>
+                    <div className="w-full bg-gray-800 h-2 rounded-full mt-4">
+                      <div 
+                        className="h-full bg-green-500 rounded-full shadow-[0_0_10px_rgba(34,197,94,0.5)] transition-all duration-1000" 
+                        style={{ width: `${diagnosis.engineHealthScore}%` }}
+                      ></div>
+                    </div>
+                  </div>
+
+                  <button className="w-full py-4 bg-red-600 text-white rounded-2xl font-bold hover:bg-red-700 transition-all flex items-center justify-center gap-2 group shadow-lg shadow-red-200">
+                    <Calendar className="h-5 w-5 group-hover:scale-110 transition-transform" />
+                    Schedule AI Checkup
+                  </button>
                 </div>
               </div>
-              
-              <div className="p-6 rounded-3xl border border-gray-100 bg-gray-50/50 hover:bg-white hover:shadow-lg transition-all">
-                <h4 className="font-bold text-gray-900 text-lg">Brake Refresh Kit</h4>
-                <p className="text-xs text-gray-500 mt-1">Front & Rear brake maintenance.</p>
-                <ul className="mt-4 space-y-2">
-                  <li className="text-sm text-gray-700 flex items-center"><CheckCircle2 className="h-4 w-4 mr-2 text-green-500" /> Front Brake Pads</li>
-                  <li className="text-sm text-gray-700 flex items-center"><CheckCircle2 className="h-4 w-4 mr-2 text-green-500" /> Brake Fluid Flush</li>
-                  <li className="text-sm text-gray-700 flex items-center"><CheckCircle2 className="h-4 w-4 mr-2 text-green-500" /> Rotor Inspection</li>
-                </ul>
-                <div className="mt-6 flex items-center justify-between">
-                  <div>
-                    <p className="text-xs text-gray-400 line-through">$620</p>
-                    <p className="text-xl font-bold text-gray-900">$540</p>
-                  </div>
-                  <button className="bg-white border border-gray-200 text-gray-700 px-4 py-2 rounded-xl text-sm font-bold hover:bg-gray-50">Add Bundle</button>
+            ) : (
+              <div className="p-12 border-2 border-dashed border-gray-100 rounded-3xl flex flex-col items-center justify-center text-center">
+                <div className="p-4 bg-gray-50 rounded-full mb-4">
+                  <Activity className="h-8 w-8 text-gray-300" />
                 </div>
+                <h3 className="font-bold text-gray-900">No active diagnosis</h3>
+                <p className="text-sm text-gray-500 mt-1 max-w-xs">Run a predictive health scan to see what your vehicle might need in the coming months.</p>
               </div>
-            </div>
+            )}
           </div>
+
+          {/* AI Maintenance Builder */}
         </div>
       </div>
     </div>

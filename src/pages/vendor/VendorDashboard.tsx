@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   ClipboardList, 
@@ -23,26 +23,52 @@ import {
   ArrowDownRight,
   Tag,
   Users,
-  MessageSquare
+  MessageSquare,
+  Loader2,
+  RefreshCw
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
+const stats = [
+  { name: 'Bookings', value: '120', icon: ClipboardList, color: 'text-blue-600', bg: 'bg-blue-50' },
+  { name: 'Revenue', value: 'AED 24,300', icon: DollarSign, color: 'text-green-600', bg: 'bg-green-50' },
+  { name: 'Rating', value: '4.8', icon: Star, color: 'text-yellow-500', bg: 'bg-yellow-50' },
+  { name: 'Pending', value: '8', icon: Clock, color: 'text-red-600', bg: 'bg-red-50' },
+];
+
 const VendorDashboard = () => {
   const navigate = useNavigate();
-  const stats = [
-    { name: "Today's Bookings", value: "0", icon: ClipboardList, color: "text-blue-600", bg: "bg-blue-50" },
-    { name: "Monthly Revenue", value: "AED 0", icon: DollarSign, color: "text-green-600", bg: "bg-green-50" },
-    { name: "Average Rating", value: "0", icon: Star, color: "text-yellow-600", bg: "bg-yellow-50" },
-    { name: "Pending Jobs", value: "0", icon: AlertCircle, color: "text-red-600", bg: "bg-red-50" },
-  ];
+  const [statsData, setStatsData] = useState<any>(null);
+  const [recentBookingsData, setRecentBookingsData] = useState<any[]>([]);
+  const [aiInsight, setAiInsight] = useState<any>(null);
+  const [isOptimizing, setIsOptimizing] = useState(false);
 
-  const [statsData, setStatsData] = React.useState<any>(null);
-  const [recentBookingsData, setRecentBookingsData] = React.useState<any[]>([]);
+  const fetchAiInsight = async () => {
+    setIsOptimizing(true);
+    try {
+      const response = await fetch('/api/ai/optimize-price', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          serviceType: 'AC Service',
+          currentPrice: 150,
+          competitorPrices: [160, 145, 170],
+          demandLevel: 'high'
+        })
+      });
+      const data = await response.json();
+      setAiInsight(data);
+    } catch (err) {
+      console.error('AI Strategy fetch failed', err);
+    } finally {
+      setIsOptimizing(false);
+    }
+  };
 
-  React.useEffect(() => {
+  useEffect(() => {
+    fetchAiInsight();
     const load = async () => {
       try {
-        // assume vendorId stored or default
         const vendorId = localStorage.getItem('vendorId') || 'vendor-1';
         const res = await fetch(`/api/vendor/stats?vendorId=${encodeURIComponent(vendorId)}`);
         const data = await res.json();
@@ -67,28 +93,51 @@ const VendorDashboard = () => {
   return (
     <div className="space-y-8">
       {/* AI Smart Alert for Vendor */}
-      <div className="bg-red-600 rounded-3xl p-6 text-white shadow-xl shadow-red-600/20 flex flex-col md:flex-row items-center justify-between gap-6 relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-64 h-full bg-linear-to-l from-white/10 to-transparent pointer-events-none" />
-        <div className="flex items-center space-x-4 relative z-10">
-          <div className="bg-white/20 p-3 rounded-2xl backdrop-blur-md">
-            <Sparkles className="h-6 w-6 text-yellow-400 fill-current" />
+      <div className="bg-black rounded-3xl p-8 text-white shadow-xl relative overflow-hidden group">
+        <div className="absolute top-0 right-0 w-96 h-full bg-linear-to-l from-red-600/20 to-transparent pointer-events-none group-hover:from-red-600/30 transition-all duration-700" />
+        
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-8 relative z-10">
+          <div className="flex items-start space-x-6">
+            <div className="bg-red-600 p-4 rounded-2xl shadow-lg shadow-red-600/20 flex-shrink-0">
+              <Sparkles className="h-8 w-8 text-white" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <span className="bg-red-600 text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-sm">AI Pulse</span>
+                <h2 className="text-2xl font-black italic tracking-tight">DYNAMIC STRATEGY</h2>
+              </div>
+              <p className="text-gray-400 text-sm max-w-xl leading-relaxed">
+                {aiInsight ? aiInsight.explanation : "Our AI is currently analyzing market trends and competitor pricing to optimize your earnings..."}
+              </p>
+            </div>
           </div>
-          <div>
-            <h2 className="text-xl font-bold">AI Demand Alert: High Traffic Expected</h2>
-            <p className="text-white/80 text-sm">Our AI predicts a 40% surge in AC service requests this weekend due to rising temperatures.</p>
-          </div>
-        </div>
-        <div className="flex items-center space-x-4 relative z-10">
-          <button onClick={() => navigate('/vendor/staff')} className="bg-white text-red-600 px-6 py-3 rounded-xl font-bold text-sm hover:bg-gray-100 transition-all active:scale-95">
-            Optimize Staffing
-          </button>
-          <button onClick={() => navigate('/vendor/promotions')} className="bg-red-700 text-white px-6 py-3 rounded-xl font-bold text-sm hover:bg-red-800 transition-all active:scale-95">
-            Create AC Deal
-          </button>
-        </div>
-      </div>
 
-      {/* Welcome Header */}
+          <div className="flex flex-col gap-3 w-full md:w-auto">
+            {aiInsight && (
+              <div className="flex items-center gap-4 bg-white/5 border border-white/10 p-4 rounded-2xl">
+                <div>
+                  <p className="text-[10px] font-bold text-gray-500 uppercase">Recommended Price</p>
+                  <p className="text-2xl font-black text-red-500">AED {aiInsight.suggestedPrice}</p>
+                </div>
+                <div className="h-10 w-px bg-white/10" />
+                <div>
+                  <p className="text-[10px] font-bold text-gray-500 uppercase">Est. Revenue Lift</p>
+                  <p className="text-2xl font-black text-green-500">+{aiInsight.expectedRevenueIncrease}%</p>
+                </div>
+              </div>
+            )}
+              <button 
+                onClick={fetchAiInsight}
+                disabled={isOptimizing}
+                className="bg-white text-black px-6 py-3 rounded-xl font-bold text-sm hover:bg-gray-100 transition-all flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50"
+              >
+                {isOptimizing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                Re-calculate Strategy
+              </button>
+            </div>
+          </div>
+        </div>
+
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Good morning, Elite Motors!</h1>
