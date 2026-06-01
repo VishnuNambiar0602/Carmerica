@@ -1,194 +1,165 @@
+import crypto from 'crypto';
 import { Router } from 'express';
+import type { Request, Response, NextFunction } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import type { SignOptions } from 'jsonwebtoken';
+import { audit } from './lib/audit.js';
+import { getJwtSecret } from './lib/config.js';
+import { deleteRow, insertRow, isDatabaseConfigured, query, rowToApi, rowsToApi, splitAllowed, updateRow } from './lib/db.js';
+import { validateAndStoreKyvDocument } from './lib/kyv.js';
+import { sendPasswordResetEmail } from './lib/mailer.js';
+import { createPaymentOrder, verifyRazorpaySignature, verifyStripeSignature } from './lib/payments.js';
 import { cacheDel, cacheGet, cacheSet } from './lib/redis.js';
-import { getAIStatus, sendAIMessage } from './lib/aiSupport.js';
-import { isSupabaseConfigured } from './lib/supabase.js';
 
 type Role = 'customer' | 'vendor' | 'admin';
-
-type UserRecord = {
-  id: string;
-  email: string;
-  passwordHash: string;
-  role: Role;
-  fullName: string;
-  phone?: string;
-  status: 'active' | 'disabled';
-  createdAt: string;
-  updatedAt: string;
-};
-
-type BookingRecord = {
-  id: string;
-  vendorId: string;
-  garageId: string;
-  serviceId: string;
-  email: string;
-  customer: string;
-  car: string;
-  service: string;
-  time: string;
-  date: string;
-  status: string;
-  price: number;
-  phone?: string;
-  license?: string;
-  cancellationReason?: string;
-  favorite?: boolean;
-  createdAt: string;
-  updatedAt: string;
-};
+type AuthedRequest = Request & { user?: { id: string; email: string; role: Role } };
 
 const router = Router();
-const JWT_SECRET = process.env.JWT_SECRET || 'carmerica-dev-secret';
 const now = () => new Date().toISOString();
-const uid = (prefix: string) => `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+const uid = (prefix: string) => `${prefix}-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
 
-const users: UserRecord[] = [
-  { id: 'user-1', email: 'john@example.com', passwordHash: bcrypt.hashSync('password123', 10), role: 'customer', fullName: 'John Doe', phone: '+1-555-0101', status: 'active', createdAt: now(), updatedAt: now() },
-  { id: 'user-2', email: 'partner@garage.com', passwordHash: bcrypt.hashSync('password123', 10), role: 'vendor', fullName: 'Elite Motors Admin', phone: '+1-555-0102', status: 'active', createdAt: now(), updatedAt: now() },
-  { id: 'user-admin', email: 'admin@carmerica.com', passwordHash: bcrypt.hashSync('admin123', 10), role: 'admin', fullName: 'System Admin', status: 'active', createdAt: now(), updatedAt: now() },
-];
+const serviceColumns = ['vendor_id', 'garage_id', 'category_id', 'name', 'description', 'price', 'duration_minutes', 'active'];
+const categoryColumns = ['name', 'slug', 'description', 'active'];
+const vendorColumns = ['user_id', 'business_name', 'email', 'phone', 'location', 'description', 'rating', 'verified', 'active'];
+const bookingColumns = ['customer_id', 'vendor_id', 'garage_id', 'service_id', 'customer_email', 'customer_name', 'vehicle', 'scheduled_date', 'scheduled_time', 'status', 'amount', 'cancellation_reason'];
+const reviewColumns = ['booking_id', 'customer_id', 'vendor_id', 'garage_id', 'rating', 'comment', 'status', 'vendor_response'];
+const promotionColumns = ['vendor_id', 'title', 'description', 'discount_type', 'discount_value', 'starts_at', 'ends_at', 'status'];
+const staffColumns = ['vendor_id', 'name', 'role', 'email', 'phone', 'active'];
+const pricingColumns = ['vendor_id', 'category_id', 'name', 'rule_type', 'payload', 'active'];
+const supportColumns = ['user_id', 'subject', 'message', 'status', 'priority', 'assigned_to'];
+const cmsColumns = ['slug', 'title', 'content', 'status'];
 
-const vendors: Array<any> = [
-  { id: 'vendor-1', userId: 'user-2', name: 'Elite Motors', businessName: 'Elite Motors', rating: 4.8, active: true, verified: true, phone: '+1-555-0102', email: 'partner@garage.com', location: 'Downtown, Dubai', description: 'Premium maintenance and repair services.', createdAt: now(), updatedAt: now() },
-];
+function asyncHandler(fn: (req: any, res: Response, next: NextFunction) => Promise<any>) {
+  return (req: Request, res: Response, next: NextFunction) => {
+    Promise.resolve(fn(req, res, next)).catch(next);
+  };
+}
 
-const garages: Array<any> = [
-  { id: 'garage-1', vendorId: 'vendor-1', name: 'Elite Auto Care', location: '123 Downtown St, Los Angeles, CA 90012', city: 'Dubai', rating: 4.8, reviews: 1240, active: true, image: 'https://picsum.photos/seed/garage1/400/250', trustScore: 98, description: 'Full service garage with AI-assisted pricing.', createdAt: now(), updatedAt: now() },
-  { id: 'garage-2', vendorId: 'vendor-1', name: 'Precision Mechanics', location: 'Al Quoz, Dubai', city: 'Dubai', rating: 4.6, reviews: 850, active: true, image: 'https://picsum.photos/seed/garage2/400/250', trustScore: 92, description: 'Fast turnaround on common maintenance jobs.', createdAt: now(), updatedAt: now() },
-];
-
-const categories: Array<any> = [
-  { id: 'cat-1', name: 'Maintenance', slug: 'maintenance', active: true, createdAt: now(), updatedAt: now() },
-  { id: 'cat-2', name: 'Repairs', slug: 'repairs', active: true, createdAt: now(), updatedAt: now() },
-  { id: 'cat-3', name: 'Diagnostics', slug: 'diagnostics', active: true, createdAt: now(), updatedAt: now() },
-  { id: 'cat-4', name: 'Electrical', slug: 'electrical', active: true, createdAt: now(), updatedAt: now() },
-];
-
-const services: Array<any> = [
-  { id: 's1', vendorId: 'vendor-1', garageId: 'garage-1', categoryId: 'cat-2', name: 'Brake Repair', description: 'Replacement of brake pads and inspection of rotors.', price: 120, durationMinutes: 90, active: true, createdAt: now(), updatedAt: now() },
-  { id: 's2', vendorId: 'vendor-1', garageId: 'garage-1', categoryId: 'cat-1', name: 'Oil Change', description: 'Oil change, filter replacement, and fluid top-up.', price: 49, durationMinutes: 30, active: true, createdAt: now(), updatedAt: now() },
-  { id: 's3', vendorId: 'vendor-1', garageId: 'garage-2', categoryId: 'cat-1', name: 'General Service', description: 'Multi-point inspection and preventative maintenance.', price: 189, durationMinutes: 120, active: true, createdAt: now(), updatedAt: now() },
-  { id: 's4', vendorId: 'vendor-1', garageId: 'garage-2', categoryId: 'cat-4', name: 'Battery Replacement', description: 'Battery test and replacement with warranty.', price: 150, durationMinutes: 30, active: true, createdAt: now(), updatedAt: now() },
-];
-
-const bookings: BookingRecord[] = [
-  { id: 'BK-1029', vendorId: 'vendor-1', garageId: 'garage-1', serviceId: 's2', email: 'john@example.com', customer: 'John Doe', car: 'Toyota Camry', service: 'Oil Change', time: '10:00 AM', date: 'Oct 12, 2026', status: 'In Progress', price: 89, phone: '+1-555-0101', createdAt: now(), updatedAt: now() },
-  { id: 'BK-1030', vendorId: 'vendor-1', garageId: 'garage-1', serviceId: 's1', email: 'sarah@example.com', customer: 'Sarah Smith', car: 'Honda Civic', service: 'Brake Repair', time: '11:30 AM', date: 'Oct 12, 2026', status: 'Pending', price: 120, phone: '+1-555-0103', createdAt: now(), updatedAt: now() },
-  { id: 'BK-1031', vendorId: 'vendor-1', garageId: 'garage-2', serviceId: 's3', email: 'mike@example.com', customer: 'Mike Johnson', car: 'Ford F-150', service: 'General Service', time: '01:00 PM', date: 'Oct 12, 2026', status: 'Confirmed', price: 189, phone: '+1-555-0104', createdAt: now(), updatedAt: now() },
-  { id: 'BK-1028', vendorId: 'vendor-1', garageId: 'garage-1', serviceId: 's3', email: 'robert@example.com', customer: 'Robert Brown', car: 'BMW 3 Series', service: 'Full Service', time: '09:00 AM', date: 'Oct 11, 2026', status: 'Completed', price: 250, phone: '+1-555-0105', createdAt: now(), updatedAt: now() },
-];
-
-const reviews: Array<any> = [
-  { id: 'rev-1', user: 'John Doe', vendor: 'Elite Auto Care', garageId: 'garage-1', rating: 5, date: '2 days ago', comment: 'Excellent service!', status: 'published', vendorResponse: '' },
-  { id: 'rev-2', user: 'Sarah Smith', vendor: 'Precision Mechanics', garageId: 'garage-2', rating: 4, date: '1 week ago', comment: 'Good experience overall.', status: 'published', vendorResponse: '' },
-  { id: 'rev-3', user: 'Mike Johnson', vendor: 'Elite Auto Care', garageId: 'garage-1', rating: 2, date: '2 weeks ago', comment: 'The service took longer than expected.', status: 'flagged', vendorResponse: '' },
-];
-
-const promotions: Array<any> = [{ id: 'promo-1', vendorId: 'vendor-1', title: 'AC Summer Deal', description: '10% off AC diagnostics', discountType: 'percent', discountValue: 10, status: 'active' }];
-const staff: Array<any> = [{ id: 'staff-1', vendorId: 'vendor-1', name: 'Alex Turner', role: 'Service Advisor', email: 'alex@elite.example', phone: '+1-555-0201', active: true }];
-const payments: Array<any> = [{ id: 'pay-1', bookingId: 'BK-1028', amount: 250, currency: 'AED', status: 'paid', method: 'card', refundAmount: 0 }];
-const wishlist: Array<any> = [{ id: 'wish-1', customerEmail: 'john@example.com', garageId: 'garage-1' }];
-const kyvDocuments: Array<any> = [{ id: 'kyv-1', vendorId: 'vendor-1', documentType: 'trade-license', fileName: 'license.pdf', status: 'approved' }];
-const notifications: Array<any> = [];
-const resetTokens: Array<any> = [];
-const supportTickets: Array<any> = [{ id: 'ticket-1', subject: 'Sample ticket', message: 'Customer needs help with a booking.', status: 'open', priority: 'medium', createdAt: now(), updatedAt: now() }];
-const cmsPages: Array<any> = [{ id: 'cms-home', slug: 'home', title: 'Home', content: '<h1>Home</h1>', status: 'published', createdAt: now(), updatedAt: now() }];
-const pricingRules: Array<any> = [{ id: 'price-1', vendorId: 'vendor-1', categoryId: 'cat-1', name: 'Weekend demand uplift', ruleType: 'percentage', payload: { percent: 10, days: ['Saturday', 'Sunday'] }, active: true, createdAt: now(), updatedAt: now() }];
-const chats: Array<any> = [
-  { id: 1, name: 'John Doe', lastMessage: 'Is my car ready for pickup?', time: '10:30 AM', unread: 2, image: 'https://i.pravatar.cc/150?u=john' },
-  { id: 2, name: 'Sarah Smith', lastMessage: 'Thank you for the quick service!', time: 'Yesterday', unread: 0, image: 'https://i.pravatar.cc/150?u=sarah' },
-];
-const messagesStore: Record<string, Array<any>> = {
-  1: [
-    { id: 1, text: 'Hello! I wanted to check the status of my Toyota Camry.', sender: 'customer', time: '09:15 AM' },
-    { id: 2, text: "Hi John! We've completed the oil change and the 50-point inspection.", sender: 'vendor', time: '09:30 AM' },
-    { id: 3, text: "That's great news. Is my car ready for pickup?", sender: 'customer', time: '10:30 AM' },
-  ],
-  2: [{ id: 1, text: 'Thank you for the great service!', sender: 'customer', time: 'Yesterday' }],
-};
-const settings: Record<string, any> = { platformName: 'CarMerica', supportEmail: 'support@carmerica.com', bookingLeadMinutes: 60, refundPolicyHours: 24 };
-
-const safeUser = (user: UserRecord | undefined) => {
-  if (!user) return null;
-  const { passwordHash, ...rest } = user;
-  return rest;
-};
-
-const issueToken = (user: UserRecord) => jwt.sign({ id: user.id, sub: user.id, role: user.role, email: user.email }, JWT_SECRET, { expiresIn: '7d' });
-
-const userFromToken = (req: any) => {
-  const header = req.headers.authorization || '';
-  if (!header.startsWith('Bearer ')) return null;
-  try {
-    const payload = jwt.verify(header.slice(7), JWT_SECRET) as { sub: string };
-    return users.find((u) => u.id === payload.sub) || null;
-  } catch {
-    return null;
+function requireDatabase(_req: Request, res: Response, next: NextFunction) {
+  if (!isDatabaseConfigured()) {
+    return res.status(503).json({ message: 'Database is not configured. Set DATABASE_URL for PostgreSQL/Supabase persistence.' });
   }
-};
-
-const requireRole = (...roles: Role[]) => (req: any, res: any, next: any) => {
-  const user = userFromToken(req);
-  if (!user) return res.status(401).json({ message: 'Unauthorized' });
-  if (!roles.includes(user.role)) return res.status(403).json({ message: 'Forbidden' });
-  req.user = user;
   next();
-};
+}
 
-const findUserByEmail = (email: string, role?: Role) => users.find((u) => u.email.toLowerCase() === String(email).toLowerCase() && (!role || u.role === role));
-
-const matches = (item: any, q: string) => {
-  const haystack = [item.name, item.businessName, item.location, item.city, item.description, item.service, item.title].filter(Boolean).join(' ').toLowerCase();
-  return haystack.includes(q.toLowerCase());
-};
+router.use(requireDatabase);
 
 const slugify = (value: string) => value.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+const tokenHash = (token: string) => crypto.createHash('sha256').update(token).digest('hex');
 
-const resolveVendorId = (req: any) => {
-  const explicitVendorId = String(req.query.vendorId || req.body?.vendorId || '').trim();
-  if (explicitVendorId) return explicitVendorId;
-  if (req.user?.role === 'vendor') {
-    return vendors.find((v) => v.userId === req.user.id)?.id || req.user.id;
+function normalizeDate(value: any) {
+  if (!value) return null;
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString().slice(0, 10);
+}
+
+function safeUser(user: any) {
+  if (!user) return null;
+  const api = rowToApi(user);
+  delete api.passwordHash;
+  delete api.password_hash;
+  return api;
+}
+
+function issueToken(user: any) {
+  const options: SignOptions = { expiresIn: (process.env.JWT_EXPIRES_IN || '2h') as SignOptions['expiresIn'] };
+  return jwt.sign(
+    { id: user.id, sub: user.id, role: user.role, email: user.email },
+    getJwtSecret(),
+    options,
+  );
+}
+
+async function findUserByEmail(email: string, role?: Role) {
+  const params: any[] = [String(email || '').toLowerCase()];
+  let sql = 'select * from users where lower(email) = $1';
+  if (role) {
+    params.push(role);
+    sql += ' and role = $2';
   }
-  return 'vendor-1';
-};
+  sql += ' limit 1';
+  const result = await query(sql, params);
+  return result.rows[0] || null;
+}
 
-const decorateService = (service: any) => ({
-  ...service,
-  category: categories.find((category) => category.id === service.categoryId)?.name || 'Uncategorized',
-  duration: service.duration || `${service.durationMinutes || 60} mins`,
-  status: service.active === false ? 'inactive' : 'active',
-});
+async function userFromToken(req: Request) {
+  const header = req.headers.authorization || '';
+  if (!header.startsWith('Bearer ')) return null;
+  const payload = jwt.verify(header.slice(7), getJwtSecret()) as { sub: string; id: string };
+  const result = await query('select * from users where id = $1 and status = $2 limit 1', [payload.sub || payload.id, 'active']);
+  return result.rows[0] || null;
+}
 
-const clearBookingCache = async (booking: Partial<BookingRecord>) => {
+function requireRole(...roles: Role[]) {
+  return asyncHandler(async (req: AuthedRequest, res, next) => {
+    const user = await userFromToken(req);
+    if (!user) return res.status(401).json({ message: 'Unauthorized' });
+    if (!roles.includes(user.role)) return res.status(403).json({ message: 'Forbidden' });
+    req.user = { id: user.id, email: user.email, role: user.role };
+    next();
+  });
+}
+
+async function resolveVendorId(req: AuthedRequest) {
+  const explicit = String(req.query.vendorId || req.body?.vendorId || '').trim();
+  if (req.user?.role === 'admin' && explicit) return explicit;
+  if (req.user?.role === 'vendor') {
+    const result = await query('select id from vendors where user_id = $1 limit 1', [req.user.id]);
+    return result.rows[0]?.id || '';
+  }
+  return explicit;
+}
+
+function serviceToApi(service: any, categories: any[] = []) {
+  const api = rowToApi(service);
+  const category = categories.find((item) => item.id === api.categoryId);
+  return {
+    ...api,
+    category: category?.name || api.category || 'Uncategorized',
+    duration: api.duration || `${api.durationMinutes || 60} mins`,
+    status: api.active === false ? 'inactive' : 'active',
+  };
+}
+
+function bookingToApi(row: any) {
+  const api = rowToApi(row);
+  return {
+    ...api,
+    email: api.customerEmail,
+    customer: api.customerName,
+    car: api.vehicle,
+    date: api.scheduledDate,
+    time: api.scheduledTime,
+    price: Number(api.amount || 0),
+  };
+}
+
+async function getCategories() {
+  const result = await query('select * from categories order by name asc');
+  return rowsToApi(result.rows);
+}
+
+async function clearBookingCache(booking: any) {
   await Promise.allSettled([
     booking.vendorId ? cacheDel(`bookings:vendor:${booking.vendorId}`) : Promise.resolve(),
-    booking.email ? cacheDel(`bookings:customer:${booking.email}`) : Promise.resolve(),
+    booking.customerEmail ? cacheDel(`bookings:customer:${booking.customerEmail}`) : Promise.resolve(),
     cacheDel('bookings:all'),
   ]);
-};
+}
 
-const clearServiceCache = async (service?: any) => {
+async function clearServiceCache(service?: any) {
   await Promise.allSettled([
     cacheDel('services:::'),
     service?.vendorId ? cacheDel(`services::${service.vendorId}:`) : Promise.resolve(),
     service?.garageId ? cacheDel(`services:::${service.garageId}`) : Promise.resolve(),
   ]);
-};
+}
 
-const buildAvailability = (vendorId: string, date: string) => {
-  const slots = ['09:00 AM', '09:30 AM', '10:00 AM', '10:30 AM', '11:00 AM', '11:30 AM', '12:00 PM', '12:30 PM', '01:00 PM', '01:30 PM', '02:00 PM', '02:30 PM', '03:00 PM', '03:30 PM', '04:00 PM', '04:30 PM', '05:00 PM'];
-  const booked = bookings.filter((b) => b.vendorId === vendorId && b.date === date && !['Cancelled', 'Completed'].includes(b.status)).map((b) => b.time);
-  return slots.filter((slot) => !booked.includes(slot)).map((time) => ({ time, available: true }));
-};
-
-async function fromCacheOrCompute<T>(key: string, ttl: number, compute: () => T): Promise<T> {
+async function fromCacheOrCompute<T>(key: string, ttl: number, compute: () => Promise<T>): Promise<T> {
   const cached = await cacheGet<T>(key);
   if (cached) return cached;
-  const result = compute();
+  const result = await compute();
   await cacheSet(key, result, ttl).catch(() => undefined);
   return result;
 }
@@ -196,715 +167,831 @@ async function fromCacheOrCompute<T>(key: string, ttl: number, compute: () => T)
 router.get('/hello', (_req, res) => res.json({ message: 'Hello from the API!' }));
 
 router.get('/health/db', (_req, res) => {
-  res.json({ status: 'ok', database: isSupabaseConfigured() ? 'supabase' : 'memory-backed', cache: process.env.REDIS_URL ? 'redis' : 'memory-backed' });
+  res.json({ status: 'ok', database: 'postgres', cache: process.env.REDIS_URL ? 'redis' : 'not-configured' });
 });
 
-router.get('/ai/health', (_req, res) => {
-  res.json(getAIStatus());
-});
+router.post('/auth/register', asyncHandler(async (req, res) => {
+  const { email, password, role = 'customer', businessName, fullName, phone } = req.body;
+  if (!email || !password) return res.status(400).json({ message: 'Missing email or password' });
+  if (!['customer', 'vendor'].includes(role)) return res.status(400).json({ message: 'Invalid role' });
+  if (String(password).length < 10) return res.status(400).json({ message: 'Password must be at least 10 characters' });
+  if (await findUserByEmail(email)) return res.status(409).json({ message: 'Email already registered' });
 
-router.post('/ai/chat', async (req, res, next) => {
-  try {
-    const userMessage = String(req.body.userMessage || '');
-    const conversationHistory = Array.isArray(req.body.conversationHistory) ? req.body.conversationHistory : [];
-    const currentAgent = req.body.currentAgent || null;
-    const userId = String(req.body.userId || 'user-1');
-
-    if (!userMessage.trim() && conversationHistory.length > 0) {
-      return res.status(400).json({ message: 'userMessage is required' });
-    }
-
-    const response = await sendAIMessage({ userMessage, conversationHistory, currentAgent, userId });
-    res.json(response);
-  } catch (error) {
-    next(error);
-  }
-});
-
-router.post('/auth/register', async (req, res) => {
-  const { email, password, role, businessName, fullName, phone } = req.body;
-  if (!email || !password || !role) return res.status(400).json({ message: 'Missing email, password, or role' });
-  if (!['customer', 'vendor', 'admin'].includes(role)) return res.status(400).json({ message: 'Invalid role' });
-  if (findUserByEmail(email)) return res.status(409).json({ message: 'Email already registered' });
-
-  const user: UserRecord = { id: uid('user'), email, role, fullName: fullName || businessName || '', phone: phone || '', status: 'active', passwordHash: await bcrypt.hash(password, 10), createdAt: now(), updatedAt: now() };
-  users.push(user);
+  const user = await insertRow('users', {
+    id: uid('user'),
+    email: String(email).toLowerCase(),
+    password_hash: await bcrypt.hash(password, 12),
+    role,
+    full_name: fullName || businessName || '',
+    phone: phone || '',
+    status: 'active',
+  });
 
   let vendor = null;
   if (role === 'vendor') {
-    vendor = { id: uid('vendor'), userId: user.id, name: businessName || fullName || email.split('@')[0], businessName: businessName || fullName || email.split('@')[0], email, phone: phone || '', rating: 0, active: true, verified: false, location: '', description: '', createdAt: now(), updatedAt: now() };
-    vendors.push(vendor);
+    vendor = await insertRow('vendors', {
+      id: uid('vendor'),
+      user_id: user.id,
+      business_name: businessName || fullName || String(email).split('@')[0],
+      email,
+      phone: phone || '',
+      rating: 0,
+      verified: false,
+      active: true,
+      location: '',
+      description: '',
+    });
   }
 
-  res.status(201).json({ message: 'Registered', token: issueToken(user), user: safeUser(user), vendor });
-});
+  await audit(req, 'register', 'user', user.id, null, user);
+  res.status(201).json({ message: 'Registered', token: issueToken({ ...user, password_hash: undefined }), user, vendor });
+}));
 
-router.post('/auth/login', async (req, res) => {
+router.post('/auth/login', asyncHandler(async (req, res) => {
   const { email, password, role } = req.body;
   if (!email || !password) return res.status(400).json({ message: 'Missing email or password' });
-  const user = findUserByEmail(email, role);
-  if (!user) return res.status(401).json({ message: 'Invalid credentials' });
-  const valid = await bcrypt.compare(password, user.passwordHash);
+  const user = await findUserByEmail(email, role);
+  if (!user || user.status !== 'active') return res.status(401).json({ message: 'Invalid credentials' });
+  const valid = await bcrypt.compare(password, user.password_hash);
   if (!valid) return res.status(401).json({ message: 'Invalid credentials' });
-  const vendor = user.role === 'vendor' ? vendors.find((v) => v.userId === user.id) || null : null;
+  const vendor = user.role === 'vendor'
+    ? rowToApi((await query('select * from vendors where user_id = $1 limit 1', [user.id])).rows[0])
+    : null;
   res.json({ message: 'Authenticated', token: issueToken(user), user: safeUser(user), vendor });
-});
+}));
 
-router.post('/admin/login', async (req, res) => {
+router.post('/admin/login', asyncHandler(async (req, res) => {
   const { email, password } = req.body;
-  const user = findUserByEmail(email, 'admin');
-  if (!email || !password || !user) return res.status(401).json({ message: 'Invalid credentials' });
-  const valid = await bcrypt.compare(password, user.passwordHash);
+  const user = await findUserByEmail(email, 'admin');
+  if (!user || user.status !== 'active') return res.status(401).json({ message: 'Invalid credentials' });
+  const valid = await bcrypt.compare(password, user.password_hash);
   if (!valid) return res.status(401).json({ message: 'Invalid credentials' });
+  await audit(req, 'login', 'admin', user.id, null, { email: user.email });
   res.json({ message: 'Authenticated', token: issueToken(user), user: safeUser(user) });
-});
+}));
 
-router.post('/auth/logout', (_req, res) => res.json({ message: 'Logged out' }));
+router.post('/auth/logout', requireRole('customer', 'vendor', 'admin'), asyncHandler(async (req: AuthedRequest, res) => {
+  await audit(req, 'logout', 'user', req.user?.id || '', null, null);
+  res.json({ message: 'Logged out' });
+}));
 
-router.post('/auth/forgot-password', (req, res) => {
+router.post('/auth/forgot-password', asyncHandler(async (req, res) => {
   const { email, role = 'customer' } = req.body;
-  const user = findUserByEmail(email, role);
-  if (!user) return res.json({ message: `If ${email} exists in our system, password reset instructions were sent.` });
-  const token = uid('reset');
-  resetTokens.push({ token, email, role, expiresAt: Date.now() + 1000 * 60 * 60 });
-  res.json({ message: `If ${email} exists in our system, password reset instructions were sent.`, resetToken: process.env.NODE_ENV === 'production' ? undefined : token });
-});
+  const user = await findUserByEmail(email, role);
+  if (user) {
+    const token = crypto.randomBytes(32).toString('hex');
+    await insertRow('password_reset_tokens', {
+      id: uid('reset'),
+      user_id: user.id,
+      token_hash: tokenHash(token),
+      expires_at: new Date(Date.now() + 1000 * 60 * 60).toISOString(),
+    });
+    await sendPasswordResetEmail(user.email, token);
+  }
+  res.json({ message: `If ${email} exists in our system, password reset instructions were sent.` });
+}));
 
-router.post('/auth/reset-password', async (req, res) => {
-  const { token, email, password, role = 'customer' } = req.body;
-  const entry = token ? resetTokens.find((t) => t.token === token && t.expiresAt > Date.now()) : resetTokens.find((t) => t.email === email && t.role === role && t.expiresAt > Date.now());
+router.post('/auth/reset-password', asyncHandler(async (req, res) => {
+  const { token, password } = req.body;
+  if (!token || !password) return res.status(400).json({ message: 'Missing token or password' });
+  if (String(password).length < 10) return res.status(400).json({ message: 'Password must be at least 10 characters' });
+
+  const result = await query(
+    'select * from password_reset_tokens where token_hash = $1 and used_at is null and expires_at > now() limit 1',
+    [tokenHash(token)],
+  );
+  const entry = result.rows[0];
   if (!entry) return res.status(400).json({ message: 'Invalid or expired reset token' });
-  const user = findUserByEmail(entry.email, entry.role);
-  if (!user) return res.status(404).json({ message: 'User not found' });
-  user.passwordHash = await bcrypt.hash(password, 10);
-  user.updatedAt = now();
+
+  await query('update users set password_hash = $2, updated_at = now() where id = $1', [entry.user_id, await bcrypt.hash(password, 12)]);
+  await query('update password_reset_tokens set used_at = now() where id = $1', [entry.id]);
   res.json({ message: 'Password updated' });
-});
+}));
 
-router.get('/auth/me', (req, res) => {
-  const user = userFromToken(req);
-  if (!user) return res.status(401).json({ message: 'Unauthorized' });
-  const vendor = user.role === 'vendor' ? vendors.find((v) => v.userId === user.id) || null : null;
-  res.json({ user: safeUser(user), vendor });
-});
+router.get('/auth/me', requireRole('customer', 'vendor', 'admin'), asyncHandler(async (req: AuthedRequest, res) => {
+  const userResult = await query('select * from users where id = $1', [req.user?.id]);
+  const user = safeUser(userResult.rows[0]);
+  const vendor = req.user?.role === 'vendor'
+    ? rowToApi((await query('select * from vendors where user_id = $1 limit 1', [req.user.id])).rows[0])
+    : null;
+  res.json({ user, vendor });
+}));
 
-router.get('/vendors', (_req, res) => res.json(vendors));
+router.get('/vendors', asyncHandler(async (_req, res) => {
+  const result = await query('select * from vendors where active = true order by verified desc, business_name asc');
+  res.json(rowsToApi(result.rows).map((vendor) => ({ ...vendor, name: vendor.businessName })));
+}));
 
-router.get('/services', async (req, res) => {
-  const query = String(req.query.query || req.query.serviceType || '').trim();
+router.get('/garages', asyncHandler(async (req, res) => {
+  const search = `%${String(req.query.query || req.query.location || req.query.q || '').trim()}%`;
+  const result = await query(
+    `select * from garages
+     where active = true and ($1 = '%%' or name ilike $1 or location ilike $1 or city ilike $1 or metadata::text ilike $1)
+     order by rating desc, name asc`,
+    [search],
+  );
+  res.json(rowsToApi(result.rows));
+}));
+
+router.get('/garages/:id', asyncHandler(async (req, res) => {
+  const result = await query('select * from garages where id = $1 and active = true', [req.params.id]);
+  if (!result.rowCount) return res.status(404).json({ message: 'Garage not found' });
+  res.json(rowToApi(result.rows[0]));
+}));
+
+router.get('/categories', asyncHandler(async (_req, res) => {
+  const result = await query(
+    `select c.*, count(s.id)::int as services
+     from categories c left join services s on s.category_id = c.id
+     group by c.id order by c.name asc`,
+  );
+  res.json(rowsToApi(result.rows).map((category) => ({ ...category, status: category.active ? 'active' : 'inactive' })));
+}));
+
+router.get('/services', asyncHandler(async (req, res) => {
+  const search = String(req.query.query || req.query.serviceType || '').trim();
   const vendorId = String(req.query.vendorId || '');
   const garageId = String(req.query.garageId || '');
-  const key = `services:${query}:${vendorId}:${garageId}`;
-
-  const result = await fromCacheOrCompute(key, 120, () => {
-    let filtered = services.filter((s) => s.active !== false);
-    if (vendorId) filtered = filtered.filter((s) => s.vendorId === vendorId);
-    if (garageId) filtered = filtered.filter((s) => s.garageId === garageId);
-    if (query) filtered = filtered.filter((s) => matches(s, query));
-    return filtered.map(decorateService);
+  const key = `services:${search}:${vendorId}:${garageId}`;
+  const result = await fromCacheOrCompute(key, 120, async () => {
+    const params: any[] = [`%${search}%`];
+    let sql = `select * from services where active = true and ($1 = '%%' or name ilike $1 or description ilike $1 or metadata::text ilike $1)`;
+    if (vendorId) {
+      params.push(vendorId);
+      sql += ` and vendor_id = $${params.length}`;
+    }
+    if (garageId) {
+      params.push(garageId);
+      sql += ` and garage_id = $${params.length}`;
+    }
+    sql += ' order by name asc';
+    const services = await query(sql, params);
+    const categories = await getCategories();
+    return services.rows.map((service) => serviceToApi(service, categories));
   });
-
   res.json(result);
-});
+}));
 
-router.post('/services', requireRole('vendor', 'admin'), async (req: any, res) => {
-  const vendorId = resolveVendorId(req);
+router.post('/services', requireRole('vendor', 'admin'), asyncHandler(async (req: AuthedRequest, res) => {
+  const vendorId = await resolveVendorId(req);
   const name = String(req.body.name || '').trim();
-  if (!name) return res.status(400).json({ message: 'Service name is required' });
-
-  const service = {
-    id: uid('svc'),
-    vendorId,
-    garageId: req.body.garageId || garages.find((g) => g.vendorId === vendorId)?.id || '',
-    categoryId: req.body.categoryId || categories.find((c) => c.slug === slugify(req.body.category || ''))?.id || '',
-    name,
-    description: req.body.description || '',
-    price: Number(req.body.price || 0),
-    durationMinutes: Number(req.body.durationMinutes || req.body.duration || 60),
-    active: req.body.active !== false && req.body.status !== 'inactive',
-    createdAt: now(),
-    updatedAt: now(),
-  };
-  services.push(service);
+  if (!vendorId || !name) return res.status(400).json({ message: 'Vendor and service name are required' });
+  const row = splitAllowed({ ...req.body, vendorId, active: req.body.status === 'inactive' ? false : req.body.active !== false }, serviceColumns);
+  const service = await insertRow('services', { id: uid('svc'), ...row });
   await clearServiceCache(service);
-  res.status(201).json(decorateService(service));
-});
+  await audit(req, 'create', 'service', service.id, null, service);
+  res.status(201).json(serviceToApi(service, await getCategories()));
+}));
 
-router.patch('/services/:id', requireRole('vendor', 'admin'), async (req, res) => {
-  const service = services.find((s) => s.id === req.params.id);
-  if (!service) return res.status(404).json({ message: 'Service not found' });
-
-  const categoryId = req.body.categoryId || categories.find((c) => c.slug === slugify(req.body.category || ''))?.id;
-  Object.assign(service, {
-    ...req.body,
-    categoryId: categoryId || service.categoryId,
-    price: req.body.price === undefined ? service.price : Number(req.body.price),
-    durationMinutes: req.body.durationMinutes === undefined && req.body.duration === undefined ? service.durationMinutes : Number(req.body.durationMinutes || req.body.duration),
-    active: req.body.status === 'inactive' ? false : req.body.status === 'active' ? true : req.body.active ?? service.active,
-    updatedAt: now(),
-  });
+router.patch('/services/:id', requireRole('vendor', 'admin'), asyncHandler(async (req: AuthedRequest, res) => {
+  const existing = rowToApi((await query('select * from services where id = $1', [req.params.id])).rows[0]);
+  if (!existing) return res.status(404).json({ message: 'Service not found' });
+  if (req.user?.role === 'vendor' && existing.vendorId !== await resolveVendorId(req)) return res.status(403).json({ message: 'Forbidden' });
+  const row = splitAllowed({ ...req.body, active: req.body.status === 'inactive' ? false : req.body.status === 'active' ? true : req.body.active }, serviceColumns);
+  const service = await updateRow('services', req.params.id, row);
   await clearServiceCache(service);
-  res.json(decorateService(service));
-});
+  await audit(req, 'update', 'service', service.id, existing, service);
+  res.json(serviceToApi(service, await getCategories()));
+}));
 
-router.delete('/services/:id', requireRole('vendor', 'admin'), async (req, res) => {
-  const index = services.findIndex((s) => s.id === req.params.id);
-  if (index === -1) return res.status(404).json({ message: 'Service not found' });
-  const [removed] = services.splice(index, 1);
+router.delete('/services/:id', requireRole('vendor', 'admin'), asyncHandler(async (req: AuthedRequest, res) => {
+  const existing = rowToApi((await query('select * from services where id = $1', [req.params.id])).rows[0]);
+  if (!existing) return res.status(404).json({ message: 'Service not found' });
+  if (req.user?.role === 'vendor' && existing.vendorId !== await resolveVendorId(req)) return res.status(403).json({ message: 'Forbidden' });
+  const removed = await deleteRow('services', req.params.id);
   await clearServiceCache(removed);
-  res.json(decorateService(removed));
-});
-
-router.get('/garages', async (req, res) => {
-  const query = String(req.query.query || req.query.location || req.query.q || '').trim();
-  const key = `garages:${query}`;
-  const result = await fromCacheOrCompute(key, 120, () => {
-    let filtered = garages.filter((g) => g.active !== false);
-    if (query) filtered = filtered.filter((g) => matches(g, query));
-    return filtered;
-  });
-  res.json(result);
-});
-
-router.get('/garages/:id', (req, res) => {
-  const garage = garages.find((g) => g.id === req.params.id);
-  if (!garage) return res.status(404).json({ message: 'Garage not found' });
-  res.json({ ...garage, services: services.filter((s) => s.garageId === garage.id) });
-});
-
-router.get('/availability/slots', (req, res) => {
-  const vendorId = String(req.query.vendorId || '');
-  const date = String(req.query.date || new Date().toDateString());
-  if (!vendorId) return res.status(400).json({ message: 'vendorId is required' });
-  res.json({ vendorId, date, slots: buildAvailability(vendorId, date) });
-});
-
-router.get('/bookings', async (req, res) => {
-  const vendorId = String(req.query.vendorId || '');
-  const customerEmail = String(req.query.customerEmail || req.query.email || '');
-  const key = vendorId ? `bookings:vendor:${vendorId}` : customerEmail ? `bookings:customer:${customerEmail}` : 'bookings:all';
-
-  const result = await fromCacheOrCompute(key, 60, () => {
-    let filtered = bookings;
-    if (vendorId) filtered = filtered.filter((b) => b.vendorId === vendorId);
-    if (customerEmail) filtered = filtered.filter((b) => b.email === customerEmail);
-    return filtered;
-  });
-
-  res.json(result);
-});
-
-router.post('/bookings', async (req, res) => {
-  const { vendorId = 'vendor-1', garageId = 'garage-1', service = 'General Service', date, time, price = 0, email, phone, customer, carModel, carYear, license } = req.body;
-  if (!date || !time || !email) return res.status(400).json({ message: 'Missing booking date, time, or email' });
-
-  const booking: BookingRecord = { id: uid('BK'), vendorId, garageId, serviceId: req.body.serviceId || '', email, phone: phone || '', customer: customer || `${req.body.firstName || ''} ${req.body.lastName || ''}`.trim() || 'Customer', car: carYear && carModel ? `${carModel} (${carYear})` : req.body.car || 'Vehicle', license: license || '', service, time, date, status: 'Pending', price: Number(price || 0), createdAt: now(), updatedAt: now() };
-  bookings.unshift(booking);
-
-  await clearBookingCache(booking);
-  notifications.unshift({ id: uid('notif'), userId: email, type: 'booking_created', title: 'Booking created', body: `Booking ${booking.id} is now pending.`, read: false, createdAt: now(), metadata: { bookingId: booking.id } });
-
-  res.status(201).json(booking);
-});
-
-router.get('/bookings/:id', (req, res) => {
-  const booking = bookings.find((b) => b.id === req.params.id);
-  if (!booking) return res.status(404).json({ message: 'Booking not found' });
-  res.json(booking);
-});
-
-router.patch('/bookings/:id', async (req, res) => {
-  const booking = bookings.find((b) => b.id === req.params.id);
-  if (!booking) return res.status(404).json({ message: 'Booking not found' });
-  Object.assign(booking, req.body, { updatedAt: now() });
-  await clearBookingCache(booking);
-  res.json(booking);
-});
-
-router.post('/bookings/:id/cancel', async (req, res) => {
-  const booking = bookings.find((b) => b.id === req.params.id);
-  if (!booking) return res.status(404).json({ message: 'Booking not found' });
-  booking.status = 'Cancelled';
-  booking.cancellationReason = req.body.reason || '';
-  booking.updatedAt = now();
-  const payment = payments.find((p) => p.bookingId === booking.id);
-  if (payment && payment.status !== 'refunded') {
-    payment.status = 'refunded';
-    payment.refundAmount = payment.amount;
-    payment.updatedAt = now();
-  }
-  await clearBookingCache(booking);
-  res.json({ message: 'Booking cancelled', booking, refund: payment ? { amount: payment.refundAmount, status: payment.status } : null });
-});
-
-router.post('/bookings/:id/reschedule', async (req, res) => {
-  const booking = bookings.find((b) => b.id === req.params.id);
-  if (!booking) return res.status(404).json({ message: 'Booking not found' });
-  booking.date = req.body.date || booking.date;
-  booking.time = req.body.time || booking.time;
-  booking.status = req.body.status || 'Confirmed';
-  booking.updatedAt = now();
-  await clearBookingCache(booking);
-  res.json({ message: 'Booking rescheduled', booking });
-});
-
-router.get('/messages', (_req, res) => res.json({ chats, messages: messagesStore }));
-
-router.post('/messages', (req, res) => {
-  const { threadId, sender, text } = req.body;
-  if (!threadId || !sender || !text) return res.status(400).json({ message: 'Missing fields' });
-  const message = { id: Date.now(), sender, text, time: new Date().toLocaleTimeString() };
-  if (!messagesStore[String(threadId)]) messagesStore[String(threadId)] = [];
-  messagesStore[String(threadId)].push(message);
-  const chat = chats.find((c) => c.id === Number(threadId));
-  if (chat) {
-    chat.lastMessage = text;
-    chat.time = message.time;
-  }
-  res.status(201).json(message);
-});
-
-router.get('/vendor/stats', (req, res) => {
-  const vendorId = String(req.query.vendorId || 'vendor-1');
-  const vendorBookings = bookings.filter((b) => b.vendorId === vendorId);
-  res.json({
-    totalBookings: vendorBookings.length,
-    monthlyRevenue: vendorBookings.reduce((sum, b) => sum + (Number(b.price) || 0), 0),
-    avgRating: vendors.find((v) => v.id === vendorId)?.rating ?? 4.7,
-    pending: vendorBookings.filter((b) => b.status === 'Pending').length,
-    recentBookings: vendorBookings.slice(-5).reverse(),
-  });
-});
-
-router.get('/notifications', (req, res) => {
-  const userId = String(req.query.userId || '');
-  const unreadOnly = String(req.query.unreadOnly || '') === 'true';
-  let result = notifications;
-  if (userId) result = result.filter((n) => n.userId === userId);
-  if (unreadOnly) result = result.filter((n) => !n.read);
-  res.json(result);
-});
-
-router.patch('/notifications/:id/read', (req, res) => {
-  const notification = notifications.find((n) => n.id === req.params.id);
-  if (!notification) return res.status(404).json({ message: 'Notification not found' });
-  notification.read = true;
-  notification.readAt = now();
-  res.json(notification);
-});
-
-router.get('/categories', (_req, res) => {
-  res.json(categories.map((category) => ({
-    ...category,
-    services: services.filter((service) => service.categoryId === category.id).length,
-    status: category.active === false ? 'inactive' : 'active',
-  })));
-});
-
-router.post('/categories', requireRole('admin'), (req, res) => {
-  const name = String(req.body.name || '').trim();
-  if (!name) return res.status(400).json({ message: 'Category name is required' });
-  const slug = req.body.slug ? slugify(req.body.slug) : slugify(name);
-  if (categories.some((category) => category.slug === slug)) return res.status(409).json({ message: 'Category already exists' });
-  const category = { id: uid('cat'), name, slug, description: req.body.description || '', active: req.body.active !== false && req.body.status !== 'inactive', createdAt: now(), updatedAt: now() };
-  categories.push(category);
-  res.status(201).json({ ...category, services: 0, status: category.active ? 'active' : 'inactive' });
-});
-
-router.patch('/categories/:id', requireRole('admin'), (req, res) => {
-  const category = categories.find((c) => c.id === req.params.id);
-  if (!category) return res.status(404).json({ message: 'Category not found' });
-  const nextSlug = req.body.slug ? slugify(req.body.slug) : undefined;
-  if (nextSlug && categories.some((c) => c.id !== category.id && c.slug === nextSlug)) return res.status(409).json({ message: 'Category slug already exists' });
-  Object.assign(category, {
-    ...req.body,
-    slug: nextSlug || category.slug,
-    active: req.body.status === 'inactive' ? false : req.body.status === 'active' ? true : req.body.active ?? category.active,
-    updatedAt: now(),
-  });
-  res.json({ ...category, services: services.filter((service) => service.categoryId === category.id).length, status: category.active ? 'active' : 'inactive' });
-});
-
-router.delete('/categories/:id', requireRole('admin'), (req, res) => {
-  const index = categories.findIndex((c) => c.id === req.params.id);
-  if (index === -1) return res.status(404).json({ message: 'Category not found' });
-  const [removed] = categories.splice(index, 1);
-  services.forEach((service) => {
-    if (service.categoryId === removed.id) service.categoryId = '';
-  });
+  await audit(req, 'delete', 'service', req.params.id, existing, null);
   res.json(removed);
-});
+}));
 
-router.get('/reviews', (req, res) => {
-  const garageId = String(req.query.garageId || '');
+router.get('/availability/slots', asyncHandler(async (req, res) => {
   const vendorId = String(req.query.vendorId || '');
-  let result = reviews;
-  if (garageId) result = result.filter((r) => r.garageId === garageId);
-  if (vendorId) {
-    const vendor = vendors.find((v) => v.id === vendorId);
-    result = result.filter((r) => r.vendor === vendor?.name || r.vendor === vendor?.businessName);
-  }
-  res.json(result);
-});
+  const date = normalizeDate(req.query.date) || new Date().toISOString().slice(0, 10);
+  const slots = ['09:00 AM', '09:30 AM', '10:00 AM', '10:30 AM', '11:00 AM', '11:30 AM', '12:00 PM', '12:30 PM', '01:00 PM', '01:30 PM', '02:00 PM', '02:30 PM', '03:00 PM', '03:30 PM', '04:00 PM', '04:30 PM', '05:00 PM'];
+  const booked = await query(
+    `select scheduled_time from bookings where vendor_id = $1 and scheduled_date = $2 and status not in ('Cancelled', 'Completed')`,
+    [vendorId, date],
+  );
+  const taken = new Set(booked.rows.map((row) => row.scheduled_time));
+  res.json(slots.filter((slot) => !taken.has(slot)).map((time) => ({ time, available: true })));
+}));
 
-router.post('/reviews', (req, res) => {
-  const review = { id: uid('rev'), user: req.body.user || 'Anonymous', vendor: req.body.vendor || 'Unknown Vendor', garageId: req.body.garageId || '', rating: Number(req.body.rating || 5), date: 'Just now', comment: req.body.comment || '', status: 'published', vendorResponse: '', createdAt: now() };
-  reviews.unshift(review);
-  res.status(201).json(review);
-});
-
-router.patch('/reviews/:id/response', requireRole('vendor', 'admin'), (req, res) => {
-  const review = reviews.find((r) => r.id === req.params.id);
-  if (!review) return res.status(404).json({ message: 'Review not found' });
-  review.vendorResponse = req.body.response || '';
-  review.respondedAt = now();
-  res.json(review);
-});
-
-router.get('/wishlist', (req, res) => {
+router.get('/bookings', asyncHandler(async (req, res) => {
+  const vendorId = String(req.query.vendorId || '');
   const customerEmail = String(req.query.customerEmail || '');
-  res.json(wishlist.filter((w) => w.customerEmail === customerEmail));
-});
+  const key = vendorId ? `bookings:vendor:${vendorId}` : customerEmail ? `bookings:customer:${customerEmail}` : 'bookings:all';
+  const result = await fromCacheOrCompute(key, 60, async () => {
+    const params: any[] = [];
+    let sql = 'select * from bookings where true';
+    if (vendorId) {
+      params.push(vendorId);
+      sql += ` and vendor_id = $${params.length}`;
+    }
+    if (customerEmail) {
+      params.push(customerEmail.toLowerCase());
+      sql += ` and lower(customer_email) = $${params.length}`;
+    }
+    sql += ' order by created_at desc';
+    return (await query(sql, params)).rows.map(bookingToApi);
+  });
+  res.json(result);
+}));
 
-router.post('/wishlist', (req, res) => {
-  const entry = { id: uid('wish'), customerEmail: req.body.customerEmail, garageId: req.body.garageId, createdAt: now() };
-  wishlist.push(entry);
+router.post('/bookings', asyncHandler(async (req, res) => {
+  const customerEmail = String(req.body.email || req.body.customerEmail || '').toLowerCase();
+  const customerName = String(req.body.customerName || `${req.body.firstName || ''} ${req.body.lastName || ''}`.trim() || 'Guest customer');
+  const amount = Number(req.body.price || req.body.amount || 0);
+  if (!customerEmail || !req.body.vendorId) return res.status(400).json({ message: 'Customer email and vendor are required' });
+  const booking = await insertRow('bookings', {
+    id: uid('bk'),
+    ...splitAllowed({
+      ...req.body,
+      customerEmail,
+      customerName,
+      vehicle: req.body.vehicle || [req.body.carYear, req.body.carModel].filter(Boolean).join(' '),
+      scheduledDate: normalizeDate(req.body.date || req.body.scheduledDate),
+      scheduledTime: req.body.time || req.body.scheduledTime,
+      status: 'Pending',
+      amount,
+    }, bookingColumns),
+  });
+  await clearBookingCache(booking);
+  res.status(201).json(bookingToApi(booking));
+}));
+
+router.get('/bookings/:id', asyncHandler(async (req, res) => {
+  const booking = (await query('select * from bookings where id = $1', [req.params.id])).rows[0];
+  if (!booking) return res.status(404).json({ message: 'Booking not found' });
+  res.json(bookingToApi(booking));
+}));
+
+router.patch('/bookings/:id', requireRole('customer', 'vendor', 'admin'), asyncHandler(async (req: AuthedRequest, res) => {
+  const existing = rowToApi((await query('select * from bookings where id = $1', [req.params.id])).rows[0]);
+  if (!existing) return res.status(404).json({ message: 'Booking not found' });
+  const row = splitAllowed({ ...req.body, scheduledDate: normalizeDate(req.body.date || req.body.scheduledDate) }, bookingColumns);
+  const booking = await updateRow('bookings', req.params.id, row);
+  await clearBookingCache(booking);
+  await audit(req, 'update', 'booking', booking.id, existing, booking);
+  res.json(bookingToApi(booking));
+}));
+
+router.post('/bookings/:id/cancel', requireRole('customer', 'vendor', 'admin'), asyncHandler(async (req: AuthedRequest, res) => {
+  const existing = rowToApi((await query('select * from bookings where id = $1', [req.params.id])).rows[0]);
+  if (!existing) return res.status(404).json({ message: 'Booking not found' });
+  const booking = await updateRow('bookings', req.params.id, { status: 'Cancelled', cancellation_reason: req.body.reason || 'Cancelled by user' });
+  const payment = rowToApi((await query('select * from payments where booking_id = $1 order by created_at desc limit 1', [req.params.id])).rows[0]);
+  if (payment && payment.status !== 'refunded') {
+    await updateRow('payments', payment.id, { status: 'refund_pending', refund_amount: payment.amount });
+  }
+  await clearBookingCache(booking);
+  await audit(req, 'cancel', 'booking', booking.id, existing, booking);
+  res.json({ message: 'Booking cancelled', booking: bookingToApi(booking), refund: payment ? { amount: payment.amount, status: 'refund_pending' } : null });
+}));
+
+router.post('/bookings/:id/reschedule', requireRole('customer', 'vendor', 'admin'), asyncHandler(async (req: AuthedRequest, res) => {
+  const booking = await updateRow('bookings', req.params.id, {
+    scheduled_date: normalizeDate(req.body.date),
+    scheduled_time: req.body.time,
+    status: 'Rescheduled',
+  });
+  if (!booking) return res.status(404).json({ message: 'Booking not found' });
+  await clearBookingCache(booking);
+  await audit(req, 'reschedule', 'booking', booking.id, null, booking);
+  res.json(bookingToApi(booking));
+}));
+
+router.post('/payments/create-order', requireRole('customer', 'admin'), asyncHandler(async (req: AuthedRequest, res) => {
+  const { bookingId } = req.body;
+  const booking = rowToApi((await query('select * from bookings where id = $1', [bookingId])).rows[0]);
+  if (!booking) return res.status(404).json({ message: 'Booking not found' });
+  if (req.user?.role === 'customer' && booking.customerEmail !== req.user.email) return res.status(403).json({ message: 'Forbidden' });
+
+  const order = await createPaymentOrder({
+    amount: Number(booking.amount || req.body.amount || 0),
+    currency: req.body.currency || 'AED',
+    receipt: booking.id,
+    metadata: { bookingId: booking.id, userId: req.user?.id || '' },
+  });
+
+  const payment = await insertRow('payments', {
+    id: uid('pay'),
+    booking_id: booking.id,
+    amount: Number(booking.amount || 0),
+    currency: req.body.currency || 'AED',
+    status: 'created',
+    provider: order.provider,
+    provider_payment_id: order.providerPaymentId,
+    metadata: order.raw,
+  });
+  await audit(req, 'create_order', 'payment', payment.id, null, payment);
+  res.status(201).json({ payment, clientSecret: order.clientSecret, provider: order.provider });
+}));
+
+router.post('/payments/confirm-razorpay', requireRole('customer', 'admin'), asyncHandler(async (req: AuthedRequest, res) => {
+  const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
+  if (!verifyRazorpaySignature(razorpay_order_id, razorpay_payment_id, razorpay_signature)) {
+    return res.status(400).json({ message: 'Invalid payment signature' });
+  }
+  const payment = rowToApi((await query('select * from payments where provider_payment_id = $1', [razorpay_order_id])).rows[0]);
+  if (!payment) return res.status(404).json({ message: 'Payment not found' });
+  const updated = await updateRow('payments', payment.id, { status: 'paid', provider_payment_id: razorpay_payment_id });
+  await audit(req, 'confirm', 'payment', payment.id, payment, updated);
+  res.json(updated);
+}));
+
+router.post('/payments/webhook/stripe', asyncHandler(async (req, res) => {
+  const payload = Buffer.isBuffer(req.body) ? req.body.toString('utf8') : JSON.stringify(req.body);
+  if (!verifyStripeSignature(payload, String(req.headers['stripe-signature'] || ''))) {
+    return res.status(400).json({ message: 'Invalid webhook signature' });
+  }
+  const event = Buffer.isBuffer(req.body) ? JSON.parse(payload) : req.body;
+  const paymentIntent = event.data?.object;
+  if (event.type === 'payment_intent.succeeded' && paymentIntent?.id) {
+    await query('update payments set status = $2, updated_at = now() where provider_payment_id = $1', [paymentIntent.id, 'paid']);
+  }
+  res.json({ received: true });
+}));
+
+router.get('/reviews', asyncHandler(async (req, res) => {
+  const params: any[] = [];
+  let sql = 'select * from reviews where status <> $1';
+  params.push('deleted');
+  if (req.query.garageId) {
+    params.push(req.query.garageId);
+    sql += ` and garage_id = $${params.length}`;
+  }
+  if (req.query.vendorId) {
+    params.push(req.query.vendorId);
+    sql += ` and vendor_id = $${params.length}`;
+  }
+  sql += ' order by created_at desc';
+  res.json(rowsToApi((await query(sql, params)).rows));
+}));
+
+router.post('/reviews', requireRole('customer', 'admin'), asyncHandler(async (req: AuthedRequest, res) => {
+  const row = splitAllowed({ ...req.body, customerId: req.user?.id, status: 'published' }, reviewColumns);
+  const review = await insertRow('reviews', { id: uid('rev'), ...row });
+  await audit(req, 'create', 'review', review.id, null, review);
+  res.status(201).json(review);
+}));
+
+router.patch('/reviews/:id/response', requireRole('vendor', 'admin'), asyncHandler(async (req: AuthedRequest, res) => {
+  const review = await updateRow('reviews', req.params.id, { vendor_response: req.body.response || '' });
+  if (!review) return res.status(404).json({ message: 'Review not found' });
+  await audit(req, 'respond', 'review', review.id, null, review);
+  res.json(review);
+}));
+
+router.get('/wishlist', requireRole('customer', 'admin'), asyncHandler(async (req: AuthedRequest, res) => {
+  const email = req.user?.role === 'customer' ? req.user.email : String(req.query.customerEmail || '');
+  res.json(rowsToApi((await query('select * from wishlist where lower(customer_email) = lower($1)', [email])).rows));
+}));
+
+router.post('/wishlist', requireRole('customer', 'admin'), asyncHandler(async (req: AuthedRequest, res) => {
+  const email = req.user?.role === 'customer' ? req.user.email : req.body.customerEmail;
+  const entry = await insertRow('wishlist', { id: uid('wish'), customer_email: email, garage_id: req.body.garageId });
   res.status(201).json(entry);
-});
+}));
 
-router.delete('/wishlist', (req, res) => {
-  const customerEmail = String(req.query.customerEmail || req.body.customerEmail || '');
+router.delete('/wishlist', requireRole('customer', 'admin'), asyncHandler(async (req: AuthedRequest, res) => {
+  const email = req.user?.role === 'customer' ? req.user.email : String(req.query.customerEmail || req.body.customerEmail || '');
   const garageId = String(req.query.garageId || req.body.garageId || '');
-  const index = wishlist.findIndex((w) => w.customerEmail === customerEmail && w.garageId === garageId);
-  if (index === -1) return res.status(404).json({ message: 'Wishlist item not found' });
-  const [removed] = wishlist.splice(index, 1);
+  const removed = rowToApi((await query('delete from wishlist where lower(customer_email) = lower($1) and garage_id = $2 returning *', [email, garageId])).rows[0]);
+  if (!removed) return res.status(404).json({ message: 'Wishlist item not found' });
   res.json(removed);
-});
+}));
 
-router.get('/admin/users', requireRole('admin'), (_req, res) => res.json(users.map(safeUser)));
-router.get('/admin/vendors', requireRole('admin'), (_req, res) => res.json(vendors));
-router.get('/admin/bookings', requireRole('admin'), (_req, res) => res.json(bookings));
-router.get('/admin/categories', requireRole('admin'), (_req, res) => res.json(categories.map((category) => ({ ...category, services: services.filter((service) => service.categoryId === category.id).length, status: category.active ? 'active' : 'inactive' }))));
-router.get('/admin/promotions', requireRole('admin'), (_req, res) => res.json(promotions));
-router.get('/admin/cms', requireRole('admin'), (_req, res) => res.json(cmsPages));
-router.get('/admin/reviews', requireRole('admin'), (_req, res) => res.json(reviews));
-router.get('/admin/support', requireRole('admin'), (_req, res) => res.json(supportTickets));
-router.get('/admin/payments', requireRole('admin'), (_req, res) => res.json(payments));
-router.get('/admin/settings', requireRole('admin'), (_req, res) => res.json(settings));
-router.get('/admin/kyv', requireRole('admin'), (_req, res) => res.json(kyvDocuments));
-router.get('/admin/pricing', requireRole('admin'), (_req, res) => res.json(pricingRules));
+router.get('/customer/bookings', requireRole('customer', 'admin'), asyncHandler(async (req: AuthedRequest, res) => {
+  const email = req.user?.role === 'customer' ? req.user.email : String(req.query.customerEmail || '');
+  const rows = (await query('select * from bookings where lower(customer_email) = lower($1) order by created_at desc', [email])).rows;
+  res.json(rows.map(bookingToApi));
+}));
 
-router.post('/admin/users', requireRole('admin'), async (req, res) => {
-  const { email, password = 'password123', role = 'customer', fullName = '', phone = '', status = 'active' } = req.body;
+router.get('/customer/profile', requireRole('customer', 'admin'), asyncHandler(async (req: AuthedRequest, res) => {
+  const email = req.user?.role === 'customer' ? req.user.email : String(req.query.email || '');
+  const user = await findUserByEmail(email, 'customer');
+  if (!user) return res.status(404).json({ message: 'Customer not found' });
+  const wish = rowsToApi((await query('select * from wishlist where lower(customer_email) = lower($1)', [email])).rows);
+  res.json({ ...safeUser(user), wishlist: wish });
+}));
+
+router.patch('/customer/profile', requireRole('customer', 'admin'), asyncHandler(async (req: AuthedRequest, res) => {
+  const id = req.user?.role === 'customer' ? req.user.id : req.body.id;
+  const allowed = {
+    full_name: req.body.fullName,
+    phone: req.body.phone,
+    metadata: req.body.metadata || {},
+  };
+  const user = await updateRow('users', id, allowed);
+  await audit(req, 'update', 'customer_profile', id, null, user);
+  res.json({ message: 'Profile updated', user });
+}));
+
+router.post('/customer/bookings/:id/favorite', requireRole('customer', 'admin'), asyncHandler(async (req: AuthedRequest, res) => {
+  const booking = await updateRow('bookings', req.params.id, { metadata: { favorite: true } });
+  await audit(req, 'favorite', 'booking', req.params.id, null, booking);
+  res.json(bookingToApi(booking));
+}));
+
+router.get('/vendor/profile', requireRole('vendor', 'admin'), asyncHandler(async (req: AuthedRequest, res) => {
+  const vendorId = await resolveVendorId(req);
+  const vendor = rowToApi((await query('select * from vendors where id = $1 or user_id = $2 limit 1', [vendorId, req.user?.id])).rows[0]);
+  if (!vendor) return res.status(404).json({ message: 'Vendor not found' });
+  res.json({ ...vendor, name: vendor.businessName });
+}));
+
+router.patch('/vendor/profile', requireRole('vendor', 'admin'), asyncHandler(async (req: AuthedRequest, res) => {
+  const vendorId = await resolveVendorId(req);
+  const existing = rowToApi((await query('select * from vendors where id = $1', [vendorId])).rows[0]);
+  if (!existing) return res.status(404).json({ message: 'Vendor not found' });
+  const vendor = await updateRow('vendors', vendorId, splitAllowed(req.body, vendorColumns));
+  await audit(req, 'update', 'vendor_profile', vendorId, existing, vendor);
+  res.json(vendor);
+}));
+
+router.get('/vendor/bookings', requireRole('vendor', 'admin'), asyncHandler(async (req: AuthedRequest, res) => {
+  const vendorId = await resolveVendorId(req);
+  res.json((await query('select * from bookings where vendor_id = $1 order by created_at desc', [vendorId])).rows.map(bookingToApi));
+}));
+
+router.get('/vendor/calendar', requireRole('vendor', 'admin'), asyncHandler(async (req: AuthedRequest, res) => {
+  const vendorId = await resolveVendorId(req);
+  const date = normalizeDate(req.query.date) || new Date().toISOString().slice(0, 10);
+  const data = (await query('select * from bookings where vendor_id = $1 and scheduled_date = $2', [vendorId, date])).rows.map(bookingToApi);
+  res.json({ vendorId, date, bookings: data });
+}));
+
+router.get('/vendor/earnings', requireRole('vendor', 'admin'), asyncHandler(async (req: AuthedRequest, res) => {
+  const vendorId = await resolveVendorId(req);
+  const bookings = (await query('select * from bookings where vendor_id = $1', [vendorId])).rows.map(bookingToApi);
+  const payments = rowsToApi((await query(
+    'select p.* from payments p join bookings b on b.id = p.booking_id where b.vendor_id = $1 order by p.created_at desc',
+    [vendorId],
+  )).rows);
+  res.json({ vendorId, revenue: bookings.reduce((sum, b) => sum + Number(b.price || 0), 0), paidPayments: payments, bookings });
+}));
+
+router.get('/vendor/services', requireRole('vendor', 'admin'), asyncHandler(async (req: AuthedRequest, res) => {
+  const vendorId = await resolveVendorId(req);
+  const services = (await query('select * from services where vendor_id = $1 order by name asc', [vendorId])).rows;
+  const categories = await getCategories();
+  res.json(services.map((service) => serviceToApi(service, categories)));
+}));
+
+router.post('/vendor/services', requireRole('vendor', 'admin'), asyncHandler(async (req: AuthedRequest, res) => {
+  const vendorId = await resolveVendorId(req);
+  const name = String(req.body.name || '').trim();
+  if (!vendorId || !name) return res.status(400).json({ message: 'Vendor and service name are required' });
+  const row = splitAllowed({ ...req.body, vendorId, active: req.body.status === 'inactive' ? false : req.body.active !== false }, serviceColumns);
+  const service = await insertRow('services', { id: uid('svc'), ...row });
+  await clearServiceCache(service);
+  await audit(req, 'create', 'service', service.id, null, service);
+  res.status(201).json(serviceToApi(service, await getCategories()));
+}));
+
+router.patch('/vendor/services/:id', requireRole('vendor', 'admin'), asyncHandler(async (req: AuthedRequest, res) => {
+  const vendorId = await resolveVendorId(req);
+  const existing = rowToApi((await query('select * from services where id = $1 and vendor_id = $2', [req.params.id, vendorId])).rows[0]);
+  if (!existing) return res.status(404).json({ message: 'Service not found' });
+  const service = await updateRow('services', req.params.id, splitAllowed(req.body, serviceColumns));
+  await clearServiceCache(service);
+  await audit(req, 'update', 'service', req.params.id, existing, service);
+  res.json(serviceToApi(service, await getCategories()));
+}));
+
+router.delete('/vendor/services/:id', requireRole('vendor', 'admin'), asyncHandler(async (req: AuthedRequest, res) => {
+  const vendorId = await resolveVendorId(req);
+  const existing = rowToApi((await query('select * from services where id = $1 and vendor_id = $2', [req.params.id, vendorId])).rows[0]);
+  if (!existing) return res.status(404).json({ message: 'Service not found' });
+  const removed = await deleteRow('services', req.params.id);
+  await clearServiceCache(removed);
+  await audit(req, 'delete', 'service', req.params.id, existing, null);
+  res.json(removed);
+}));
+
+router.get('/vendor/staff', requireRole('vendor', 'admin'), asyncHandler(async (req: AuthedRequest, res) => {
+  res.json(rowsToApi((await query('select * from staff where vendor_id = $1 order by name asc', [await resolveVendorId(req)])).rows));
+}));
+
+router.post('/vendor/staff', requireRole('vendor', 'admin'), asyncHandler(async (req: AuthedRequest, res) => {
+  const entry = await insertRow('staff', { id: uid('staff'), ...splitAllowed({ ...req.body, vendorId: await resolveVendorId(req), active: req.body.active !== false }, staffColumns) });
+  await audit(req, 'create', 'staff', entry.id, null, entry);
+  res.status(201).json(entry);
+}));
+
+router.patch('/vendor/staff/:id', requireRole('vendor', 'admin'), asyncHandler(async (req: AuthedRequest, res) => {
+  const entry = await updateRow('staff', req.params.id, splitAllowed(req.body, staffColumns));
+  if (!entry) return res.status(404).json({ message: 'Staff member not found' });
+  await audit(req, 'update', 'staff', entry.id, null, entry);
+  res.json(entry);
+}));
+
+router.delete('/vendor/staff/:id', requireRole('vendor', 'admin'), asyncHandler(async (req: AuthedRequest, res) => {
+  const removed = await deleteRow('staff', req.params.id);
+  if (!removed) return res.status(404).json({ message: 'Staff member not found' });
+  await audit(req, 'delete', 'staff', req.params.id, removed, null);
+  res.json(removed);
+}));
+
+router.get('/vendor/promotions', requireRole('vendor', 'admin'), asyncHandler(async (req: AuthedRequest, res) => {
+  res.json(rowsToApi((await query('select * from promotions where vendor_id = $1 order by created_at desc', [await resolveVendorId(req)])).rows));
+}));
+
+router.post('/vendor/promotions', requireRole('vendor', 'admin'), asyncHandler(async (req: AuthedRequest, res) => {
+  const entry = await insertRow('promotions', { id: uid('promo'), ...splitAllowed({ ...req.body, vendorId: await resolveVendorId(req) }, promotionColumns) });
+  await audit(req, 'create', 'promotion', entry.id, null, entry);
+  res.status(201).json(entry);
+}));
+
+router.patch('/vendor/promotions/:id', requireRole('vendor', 'admin'), asyncHandler(async (req: AuthedRequest, res) => {
+  const entry = await updateRow('promotions', req.params.id, splitAllowed(req.body, promotionColumns));
+  if (!entry) return res.status(404).json({ message: 'Promotion not found' });
+  await audit(req, 'update', 'promotion', entry.id, null, entry);
+  res.json(entry);
+}));
+
+router.delete('/vendor/promotions/:id', requireRole('vendor', 'admin'), asyncHandler(async (req: AuthedRequest, res) => {
+  const removed = await deleteRow('promotions', req.params.id);
+  if (!removed) return res.status(404).json({ message: 'Promotion not found' });
+  await audit(req, 'delete', 'promotion', req.params.id, removed, null);
+  res.json(removed);
+}));
+
+router.get('/vendor/kyv', requireRole('vendor', 'admin'), asyncHandler(async (req: AuthedRequest, res) => {
+  res.json(rowsToApi((await query('select * from kyv_documents where vendor_id = $1 order by created_at desc', [await resolveVendorId(req)])).rows));
+}));
+
+router.post('/vendor/kyv', requireRole('vendor', 'admin'), asyncHandler(async (req: AuthedRequest, res) => {
+  const vendorId = await resolveVendorId(req);
+  const doc = await validateAndStoreKyvDocument(req.body, vendorId);
+  const entry = await insertRow('kyv_documents', {
+    id: uid('kyv'),
+    vendor_id: vendorId,
+    document_type: doc.documentType,
+    file_name: doc.fileName,
+    file_url: doc.fileUrl,
+    file_hash: doc.fileHash,
+    file_size: doc.fileSize,
+    mime_type: doc.mimeType,
+    status: 'pending',
+  });
+  await audit(req, 'submit', 'kyv_document', entry.id, null, entry);
+  res.status(201).json(entry);
+}));
+
+router.get('/notifications', requireRole('customer', 'vendor', 'admin'), asyncHandler(async (req: AuthedRequest, res) => {
+  res.json(rowsToApi((await query('select * from notifications where user_id = $1 order by created_at desc', [req.user?.id])).rows));
+}));
+
+router.patch('/notifications/:id/read', requireRole('customer', 'vendor', 'admin'), asyncHandler(async (req, res) => {
+  res.json(await updateRow('notifications', req.params.id, { is_read: true, read_at: now() }));
+}));
+
+router.get('/messages', requireRole('customer', 'vendor', 'admin'), asyncHandler(async (req: AuthedRequest, res) => {
+  const rows = rowsToApi((await query(
+    'select * from messages where sender_id = $1 or recipient_id = $1 order by created_at desc limit 100',
+    [req.user?.id],
+  )).rows);
+  res.json({ chats: [], messages: rows });
+}));
+
+router.post('/messages', requireRole('customer', 'vendor', 'admin'), asyncHandler(async (req: AuthedRequest, res) => {
+  const message = await insertRow('messages', {
+    id: uid('msg'),
+    thread_id: req.body.threadId || uid('thread'),
+    sender_role: req.user?.role,
+    sender_id: req.user?.id,
+    recipient_id: req.body.recipientId || null,
+    body: req.body.body || req.body.text || '',
+    metadata: req.body.metadata || {},
+  });
+  res.status(201).json(message);
+}));
+
+router.get('/admin/users', requireRole('admin'), asyncHandler(async (_req, res) => {
+  res.json((await query('select * from users order by created_at desc')).rows.map(safeUser));
+}));
+
+router.get('/admin/vendors', requireRole('admin'), asyncHandler(async (_req, res) => {
+  res.json(rowsToApi((await query('select * from vendors order by created_at desc')).rows));
+}));
+
+router.get('/admin/bookings', requireRole('admin'), asyncHandler(async (_req, res) => {
+  res.json((await query('select * from bookings order by created_at desc')).rows.map(bookingToApi));
+}));
+
+router.get('/admin/categories', requireRole('admin'), asyncHandler(async (_req, res) => {
+  const result = await query(
+    `select c.*, count(s.id)::int as services from categories c left join services s on s.category_id = c.id group by c.id order by c.name asc`,
+  );
+  res.json(rowsToApi(result.rows).map((category) => ({ ...category, status: category.active ? 'active' : 'inactive' })));
+}));
+
+router.get('/admin/promotions', requireRole('admin'), asyncHandler(async (_req, res) => res.json(rowsToApi((await query('select * from promotions order by created_at desc')).rows))));
+router.get('/admin/cms', requireRole('admin'), asyncHandler(async (_req, res) => res.json(rowsToApi((await query('select * from cms_pages order by created_at desc')).rows))));
+router.get('/admin/reviews', requireRole('admin'), asyncHandler(async (_req, res) => res.json(rowsToApi((await query('select * from reviews order by created_at desc')).rows))));
+router.get('/admin/support', requireRole('admin'), asyncHandler(async (_req, res) => res.json(rowsToApi((await query('select * from support_tickets order by created_at desc')).rows))));
+router.get('/admin/payments', requireRole('admin'), asyncHandler(async (_req, res) => res.json(rowsToApi((await query('select * from payments order by created_at desc')).rows))));
+router.get('/admin/kyv', requireRole('admin'), asyncHandler(async (_req, res) => res.json(rowsToApi((await query('select * from kyv_documents order by created_at desc')).rows))));
+router.get('/admin/pricing', requireRole('admin'), asyncHandler(async (_req, res) => res.json(rowsToApi((await query('select * from pricing_rules order by created_at desc')).rows))));
+router.get('/admin/audit-logs', requireRole('admin'), asyncHandler(async (_req, res) => res.json(rowsToApi((await query('select * from audit_logs order by created_at desc limit 500')).rows))));
+
+router.get('/admin/settings', requireRole('admin'), asyncHandler(async (_req, res) => {
+  const rows = rowsToApi((await query('select * from platform_settings order by key asc')).rows);
+  res.json(Object.fromEntries(rows.map((row) => [row.key, row.value])));
+}));
+
+router.post('/admin/users', requireRole('admin'), asyncHandler(async (req: AuthedRequest, res) => {
+  const { email, password, role = 'customer', fullName = '', phone = '', status = 'active' } = req.body;
   if (!email) return res.status(400).json({ message: 'Email is required' });
-  if (findUserByEmail(email)) return res.status(409).json({ message: 'Email already registered' });
-  const user: UserRecord = { id: uid('user'), email, passwordHash: await bcrypt.hash(password, 10), role, fullName, phone, status, createdAt: now(), updatedAt: now() };
-  users.push(user);
-  res.status(201).json(safeUser(user));
-});
+  if (!['customer', 'vendor', 'admin'].includes(role)) return res.status(400).json({ message: 'Invalid role' });
+  if (await findUserByEmail(email)) return res.status(409).json({ message: 'Email already registered' });
+  const initialPassword = password || crypto.randomBytes(18).toString('base64url');
+  const user = await insertRow('users', {
+    id: uid('user'),
+    email: String(email).toLowerCase(),
+    password_hash: await bcrypt.hash(initialPassword, 12),
+    role,
+    full_name: fullName,
+    phone,
+    status,
+  });
+  if (!password) {
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    await insertRow('password_reset_tokens', { id: uid('reset'), user_id: user.id, token_hash: tokenHash(resetToken), expires_at: new Date(Date.now() + 3600000).toISOString() });
+    await sendPasswordResetEmail(user.email, resetToken);
+  }
+  await audit(req, 'create', 'user', user.id, null, user);
+  res.status(201).json(user);
+}));
 
-router.patch('/admin/users/:id', requireRole('admin'), (req, res) => {
-  const user = users.find((u) => u.id === req.params.id);
-  if (!user) return res.status(404).json({ message: 'User not found' });
-  Object.assign(user, req.body, { updatedAt: now() });
-  res.json(safeUser(user));
-});
+router.patch('/admin/users/:id', requireRole('admin'), asyncHandler(async (req: AuthedRequest, res) => {
+  const before = safeUser((await query('select * from users where id = $1', [req.params.id])).rows[0]);
+  if (!before) return res.status(404).json({ message: 'User not found' });
+  const row: any = {};
+  if (req.body.fullName !== undefined) row.full_name = req.body.fullName;
+  if (req.body.phone !== undefined) row.phone = req.body.phone;
+  if (req.body.status !== undefined) row.status = req.body.status;
+  if (req.body.role !== undefined) row.role = req.body.role;
+  const user = await updateRow('users', req.params.id, row);
+  await audit(req, 'update', 'user', req.params.id, before, user);
+  res.json(user);
+}));
 
-router.delete('/admin/users/:id', requireRole('admin'), (req, res) => {
-  const index = users.findIndex((u) => u.id === req.params.id);
-  if (index === -1) return res.status(404).json({ message: 'User not found' });
-  const [removed] = users.splice(index, 1);
-  res.json(safeUser(removed));
-});
+router.delete('/admin/users/:id', requireRole('admin'), asyncHandler(async (req: AuthedRequest, res) => {
+  const removed = await deleteRow('users', req.params.id);
+  if (!removed) return res.status(404).json({ message: 'User not found' });
+  await audit(req, 'delete', 'user', req.params.id, removed, null);
+  res.json(removed);
+}));
 
-router.post('/admin/vendors', requireRole('admin'), (req, res) => {
+router.post('/admin/vendors', requireRole('admin'), asyncHandler(async (req: AuthedRequest, res) => {
   const businessName = String(req.body.businessName || req.body.name || '').trim();
   if (!businessName) return res.status(400).json({ message: 'Business name is required' });
-  const vendor = { id: uid('vendor'), userId: req.body.userId || '', name: businessName, businessName, rating: Number(req.body.rating || 0), active: req.body.active !== false, verified: Boolean(req.body.verified), phone: req.body.phone || '', email: req.body.email || '', location: req.body.location || '', description: req.body.description || '', createdAt: now(), updatedAt: now() };
-  vendors.push(vendor);
+  const vendor = await insertRow('vendors', { id: uid('vendor'), ...splitAllowed({ ...req.body, businessName }, vendorColumns) });
+  await audit(req, 'create', 'vendor', vendor.id, null, vendor);
   res.status(201).json(vendor);
-});
+}));
 
-router.patch('/admin/vendors/:id', requireRole('admin'), (req, res) => {
-  const vendor = vendors.find((v) => v.id === req.params.id);
-  if (!vendor) return res.status(404).json({ message: 'Vendor not found' });
-  Object.assign(vendor, req.body, { updatedAt: now() });
+router.patch('/admin/vendors/:id', requireRole('admin'), asyncHandler(async (req: AuthedRequest, res) => {
+  const before = rowToApi((await query('select * from vendors where id = $1', [req.params.id])).rows[0]);
+  if (!before) return res.status(404).json({ message: 'Vendor not found' });
+  const vendor = await updateRow('vendors', req.params.id, splitAllowed(req.body, vendorColumns));
+  await audit(req, 'update', 'vendor', req.params.id, before, vendor);
   res.json(vendor);
-});
+}));
 
-router.delete('/admin/vendors/:id', requireRole('admin'), (req, res) => {
-  const index = vendors.findIndex((v) => v.id === req.params.id);
-  if (index === -1) return res.status(404).json({ message: 'Vendor not found' });
-  const [removed] = vendors.splice(index, 1);
+router.delete('/admin/vendors/:id', requireRole('admin'), asyncHandler(async (req: AuthedRequest, res) => {
+  const removed = await deleteRow('vendors', req.params.id);
+  if (!removed) return res.status(404).json({ message: 'Vendor not found' });
+  await audit(req, 'delete', 'vendor', req.params.id, removed, null);
   res.json(removed);
-});
+}));
 
-router.patch('/admin/settings', requireRole('admin'), (req, res) => {
-  Object.assign(settings, req.body, { updatedAt: now() });
-  res.json(settings);
-});
-
-router.post('/admin/cms', requireRole('admin'), (req, res) => {
-  const title = String(req.body.title || '').trim();
-  if (!title) return res.status(400).json({ message: 'Page title is required' });
-  const page = { id: uid('cms'), slug: req.body.slug ? slugify(req.body.slug) : slugify(title), title, content: req.body.content || '', status: req.body.status || 'draft', createdAt: now(), updatedAt: now() };
-  cmsPages.push(page);
-  res.status(201).json(page);
-});
-
-router.patch('/admin/cms/:id', requireRole('admin'), (req, res) => {
-  const page = cmsPages.find((p) => p.id === req.params.id || p.slug === req.params.id);
-  if (!page) return res.status(404).json({ message: 'Page not found' });
-  Object.assign(page, req.body, { slug: req.body.slug ? slugify(req.body.slug) : page.slug, updatedAt: now() });
-  res.json(page);
-});
-
-router.delete('/admin/cms/:id', requireRole('admin'), (req, res) => {
-  const index = cmsPages.findIndex((p) => p.id === req.params.id || p.slug === req.params.id);
-  if (index === -1) return res.status(404).json({ message: 'Page not found' });
-  const [removed] = cmsPages.splice(index, 1);
-  res.json(removed);
-});
-
-router.post('/admin/support', requireRole('admin'), (req, res) => {
-  const ticket = { id: uid('ticket'), subject: req.body.subject || 'Support request', message: req.body.message || '', status: req.body.status || 'open', priority: req.body.priority || 'medium', userId: req.body.userId || '', assignedTo: req.body.assignedTo || '', createdAt: now(), updatedAt: now() };
-  supportTickets.unshift(ticket);
-  res.status(201).json(ticket);
-});
-
-router.patch('/admin/support/:id', requireRole('admin'), (req, res) => {
-  const ticket = supportTickets.find((t) => t.id === req.params.id);
-  if (!ticket) return res.status(404).json({ message: 'Support ticket not found' });
-  Object.assign(ticket, req.body, { updatedAt: now() });
-  res.json(ticket);
-});
-
-router.post('/admin/pricing', requireRole('admin'), (req, res) => {
-  const rule = { id: uid('price'), vendorId: req.body.vendorId || '', categoryId: req.body.categoryId || '', name: req.body.name || 'Pricing rule', ruleType: req.body.ruleType || req.body.rule_type || 'fixed', payload: req.body.payload || {}, active: req.body.active !== false, createdAt: now(), updatedAt: now() };
-  pricingRules.push(rule);
-  res.status(201).json(rule);
-});
-
-router.patch('/admin/pricing/:id', requireRole('admin'), (req, res) => {
-  const rule = pricingRules.find((p) => p.id === req.params.id);
-  if (!rule) return res.status(404).json({ message: 'Pricing rule not found' });
-  Object.assign(rule, req.body, { updatedAt: now() });
-  res.json(rule);
-});
-
-router.delete('/admin/pricing/:id', requireRole('admin'), (req, res) => {
-  const index = pricingRules.findIndex((p) => p.id === req.params.id);
-  if (index === -1) return res.status(404).json({ message: 'Pricing rule not found' });
-  const [removed] = pricingRules.splice(index, 1);
-  res.json(removed);
-});
-
-router.patch('/admin/kyv/:id/approve', requireRole('admin'), (req, res) => {
-  const document = kyvDocuments.find((k) => k.id === req.params.id);
-  if (!document) return res.status(404).json({ message: 'KYV document not found' });
-  document.status = 'approved';
-  document.reviewedAt = now();
-  res.json(document);
-});
-
-router.post('/admin/kyv/:id/reject', requireRole('admin'), (req, res) => {
-  const document = kyvDocuments.find((k) => k.id === req.params.id);
-  if (!document) return res.status(404).json({ message: 'KYV document not found' });
-  document.status = 'rejected';
-  document.reviewNote = req.body.reason || '';
-  document.reviewedAt = now();
-  res.json(document);
-});
-
-router.get('/admin/analytics', requireRole('admin'), (_req, res) => {
-  const byStatus = bookings.reduce((acc: Record<string, number>, booking) => {
-    acc[booking.status] = (acc[booking.status] || 0) + 1;
-    return acc;
-  }, {});
-
-  res.json({
-    totalBookings: bookings.length,
-    totalRevenue: bookings.reduce((sum, b) => sum + (Number(b.price) || 0), 0),
-    totalUsers: users.length,
-    totalVendors: vendors.length,
-    bookingStatusBreakdown: byStatus,
-    recentBookings: bookings.slice(0, 10),
-    topVendors: vendors.slice(0, 10),
-  });
-});
-
-router.get('/customer/bookings', requireRole('customer', 'admin'), (req: any, res) => {
-  const email = req.user?.email || String(req.query.customerEmail || '');
-  res.json(bookings.filter((b) => b.email === email));
-});
-
-router.get('/customer/profile', (req, res) => {
-  const email = String(req.query.email || '');
-  const user = findUserByEmail(email, 'customer');
-  if (!user) return res.status(404).json({ message: 'Customer not found' });
-  res.json({ ...safeUser(user), wishlist: wishlist.filter((w) => w.customerEmail === email) });
-});
-
-router.patch('/customer/profile', (req, res) => {
-  const email = String(req.body.email || '');
-  const user = findUserByEmail(email, 'customer');
-  if (!user) return res.status(404).json({ message: 'Customer not found' });
-  Object.assign(user, req.body, { updatedAt: now() });
-  res.json({ message: 'Profile updated', user: safeUser(user) });
-});
-
-router.post('/customer/bookings/:id/favorite', requireRole('customer', 'admin'), (req, res) => {
-  const booking = bookings.find((b) => b.id === req.params.id);
-  if (!booking) return res.status(404).json({ message: 'Booking not found' });
-  booking.favorite = true;
-  res.json(booking);
-});
-
-router.get('/vendor/profile', requireRole('vendor', 'admin'), (req: any, res) => {
-  const vendorId = resolveVendorId(req);
-  const vendor = vendors.find((v) => v.userId === req.user.id || v.id === vendorId);
-  if (!vendor) return res.status(404).json({ message: 'Vendor not found' });
-  res.json(vendor);
-});
-
-router.patch('/vendor/profile', requireRole('vendor', 'admin'), (req: any, res) => {
-  const vendorId = resolveVendorId(req);
-  const vendor = vendors.find((v) => v.userId === req.user.id || v.id === vendorId);
-  if (!vendor) return res.status(404).json({ message: 'Vendor not found' });
-  Object.assign(vendor, req.body, { updatedAt: now() });
-  res.json(vendor);
-});
-
-router.get('/vendor/bookings', requireRole('vendor', 'admin'), (req: any, res) => {
-  const vendorId = resolveVendorId(req);
-  res.json(bookings.filter((b) => b.vendorId === vendorId));
-});
-
-router.get('/vendor/calendar', requireRole('vendor', 'admin'), (req: any, res) => {
-  const vendorId = resolveVendorId(req);
-  const date = String(req.query.date || '');
-  const data = bookings.filter((b) => b.vendorId === vendorId && (!date || b.date === date));
-  res.json({ vendorId, date, bookings: data, availability: buildAvailability(vendorId, date || new Date().toDateString()) });
-});
-
-router.get('/vendor/earnings', requireRole('vendor', 'admin'), (req: any, res) => {
-  const vendorId = resolveVendorId(req);
-  const vendorBookings = bookings.filter((b) => b.vendorId === vendorId);
-  const revenue = vendorBookings.reduce((sum, b) => sum + (Number(b.price) || 0), 0);
-  const paid = payments.filter((p) => vendorBookings.some((b) => b.id === p.bookingId));
-  res.json({ vendorId, revenue, paidPayments: paid, bookings: vendorBookings });
-});
-
-router.get('/vendor/services', requireRole('vendor', 'admin'), (req: any, res) => {
-  const vendorId = resolveVendorId(req);
-  res.json(services.filter((s) => s.vendorId === vendorId).map(decorateService));
-});
-
-router.post('/vendor/services', requireRole('vendor', 'admin'), async (req: any, res) => {
-  const vendorId = resolveVendorId(req);
+router.post('/categories', requireRole('admin'), asyncHandler(async (req: AuthedRequest, res) => {
   const name = String(req.body.name || '').trim();
-  if (!name) return res.status(400).json({ message: 'Service name is required' });
-  const service = {
-    id: uid('svc'),
-    vendorId,
-    garageId: req.body.garageId || garages.find((g) => g.vendorId === vendorId)?.id || '',
-    categoryId: req.body.categoryId || categories.find((c) => c.slug === slugify(req.body.category || ''))?.id || '',
-    name,
-    description: req.body.description || '',
-    price: Number(req.body.price || 0),
-    durationMinutes: Number(req.body.durationMinutes || req.body.duration || 60),
-    active: req.body.active !== false && req.body.status !== 'inactive',
-    createdAt: now(),
-    updatedAt: now(),
-  };
-  services.push(service);
-  await clearServiceCache(service);
-  res.status(201).json(decorateService(service));
-});
+  if (!name) return res.status(400).json({ message: 'Category name is required' });
+  const category = await insertRow('categories', { id: uid('cat'), ...splitAllowed({ ...req.body, slug: req.body.slug || slugify(name), active: req.body.active !== false }, categoryColumns) });
+  await audit(req, 'create', 'category', category.id, null, category);
+  res.status(201).json(category);
+}));
 
-router.patch('/vendor/services/:id', requireRole('vendor', 'admin'), async (req, res) => {
-  const service = services.find((s) => s.id === req.params.id);
-  if (!service) return res.status(404).json({ message: 'Service not found' });
-  const categoryId = req.body.categoryId || categories.find((c) => c.slug === slugify(req.body.category || ''))?.id;
-  Object.assign(service, {
-    ...req.body,
-    categoryId: categoryId || service.categoryId,
-    price: req.body.price === undefined ? service.price : Number(req.body.price),
-    durationMinutes: req.body.durationMinutes === undefined && req.body.duration === undefined ? service.durationMinutes : Number(req.body.durationMinutes || req.body.duration),
-    active: req.body.status === 'inactive' ? false : req.body.status === 'active' ? true : req.body.active ?? service.active,
-    updatedAt: now(),
+router.patch('/categories/:id', requireRole('admin'), asyncHandler(async (req: AuthedRequest, res) => {
+  const category = await updateRow('categories', req.params.id, splitAllowed({ ...req.body, slug: req.body.slug ? slugify(req.body.slug) : undefined }, categoryColumns));
+  if (!category) return res.status(404).json({ message: 'Category not found' });
+  await audit(req, 'update', 'category', category.id, null, category);
+  res.json(category);
+}));
+
+router.delete('/categories/:id', requireRole('admin'), asyncHandler(async (req: AuthedRequest, res) => {
+  const removed = await deleteRow('categories', req.params.id);
+  if (!removed) return res.status(404).json({ message: 'Category not found' });
+  await audit(req, 'delete', 'category', req.params.id, removed, null);
+  res.json(removed);
+}));
+
+router.patch('/admin/settings', requireRole('admin'), asyncHandler(async (req: AuthedRequest, res) => {
+  for (const [key, value] of Object.entries(req.body)) {
+    await query(
+      `insert into platform_settings (key, value, updated_at) values ($1, $2, now())
+       on conflict (key) do update set value = excluded.value, updated_at = now()`,
+      [key, JSON.stringify(value)],
+    );
+  }
+  await audit(req, 'update', 'settings', 'platform', null, req.body);
+  res.json(req.body);
+}));
+
+router.post('/admin/cms', requireRole('admin'), asyncHandler(async (req: AuthedRequest, res) => {
+  const page = await insertRow('cms_pages', splitAllowed({ ...req.body, slug: req.body.slug || slugify(req.body.title || '') }, cmsColumns));
+  await audit(req, 'create', 'cms_page', page.slug, null, page);
+  res.status(201).json(page);
+}));
+
+router.patch('/admin/cms/:id', requireRole('admin'), asyncHandler(async (req: AuthedRequest, res) => {
+  const row = splitAllowed({ ...req.body, slug: req.body.slug ? slugify(req.body.slug) : undefined }, cmsColumns);
+  const result = await query(
+    `update cms_pages set ${Object.keys(row).map((key, index) => `${key} = $${index + 2}`).join(', ')}, updated_at = now()
+     where slug = $1 returning *`,
+    [req.params.id, ...Object.values(row)],
+  );
+  const page = rowToApi(result.rows[0]);
+  if (!page) return res.status(404).json({ message: 'Page not found' });
+  await audit(req, 'update', 'cms_page', req.params.id, null, page);
+  res.json(page);
+}));
+
+router.delete('/admin/cms/:id', requireRole('admin'), asyncHandler(async (req: AuthedRequest, res) => {
+  const page = rowToApi((await query('delete from cms_pages where slug = $1 returning *', [req.params.id])).rows[0]);
+  if (!page) return res.status(404).json({ message: 'Page not found' });
+  await audit(req, 'delete', 'cms_page', req.params.id, page, null);
+  res.json(page);
+}));
+
+router.post('/admin/support', requireRole('admin'), asyncHandler(async (req: AuthedRequest, res) => {
+  const ticket = await insertRow('support_tickets', { id: uid('ticket'), ...splitAllowed(req.body, supportColumns) });
+  await audit(req, 'create', 'support_ticket', ticket.id, null, ticket);
+  res.status(201).json(ticket);
+}));
+
+router.patch('/admin/support/:id', requireRole('admin'), asyncHandler(async (req: AuthedRequest, res) => {
+  const ticket = await updateRow('support_tickets', req.params.id, splitAllowed(req.body, supportColumns));
+  if (!ticket) return res.status(404).json({ message: 'Support ticket not found' });
+  await audit(req, 'update', 'support_ticket', ticket.id, null, ticket);
+  res.json(ticket);
+}));
+
+router.post('/admin/pricing', requireRole('admin'), asyncHandler(async (req: AuthedRequest, res) => {
+  const rule = await insertRow('pricing_rules', { id: uid('price'), ...splitAllowed(req.body, pricingColumns) });
+  await audit(req, 'create', 'pricing_rule', rule.id, null, rule);
+  res.status(201).json(rule);
+}));
+
+router.patch('/admin/pricing/:id', requireRole('admin'), asyncHandler(async (req: AuthedRequest, res) => {
+  const rule = await updateRow('pricing_rules', req.params.id, splitAllowed(req.body, pricingColumns));
+  if (!rule) return res.status(404).json({ message: 'Pricing rule not found' });
+  await audit(req, 'update', 'pricing_rule', rule.id, null, rule);
+  res.json(rule);
+}));
+
+router.delete('/admin/pricing/:id', requireRole('admin'), asyncHandler(async (req: AuthedRequest, res) => {
+  const removed = await deleteRow('pricing_rules', req.params.id);
+  if (!removed) return res.status(404).json({ message: 'Pricing rule not found' });
+  await audit(req, 'delete', 'pricing_rule', req.params.id, removed, null);
+  res.json(removed);
+}));
+
+router.patch('/admin/kyv/:id/approve', requireRole('admin'), asyncHandler(async (req: AuthedRequest, res) => {
+  const document = await updateRow('kyv_documents', req.params.id, { status: 'approved', reviewed_by: req.user?.id, reviewed_at: now(), review_note: req.body.note || '' });
+  if (!document) return res.status(404).json({ message: 'KYV document not found' });
+  await audit(req, 'approve', 'kyv_document', document.id, null, document);
+  res.json(document);
+}));
+
+router.post('/admin/kyv/:id/reject', requireRole('admin'), asyncHandler(async (req: AuthedRequest, res) => {
+  const document = await updateRow('kyv_documents', req.params.id, { status: 'rejected', reviewed_by: req.user?.id, reviewed_at: now(), review_note: req.body.reason || '' });
+  if (!document) return res.status(404).json({ message: 'KYV document not found' });
+  await audit(req, 'reject', 'kyv_document', document.id, null, document);
+  res.json(document);
+}));
+
+router.get('/admin/analytics', requireRole('admin'), asyncHandler(async (_req, res) => {
+  const summary = await query(`
+    select
+      (select count(*)::int from bookings) as total_bookings,
+      (select coalesce(sum(amount), 0)::numeric from bookings) as total_revenue,
+      (select count(*)::int from users) as total_users,
+      (select count(*)::int from vendors) as total_vendors
+  `);
+  const breakdown = await query('select status, count(*)::int from bookings group by status');
+  const recentBookings = (await query('select * from bookings order by created_at desc limit 10')).rows.map(bookingToApi);
+  const topVendors = rowsToApi((await query('select * from vendors order by rating desc limit 10')).rows);
+  res.json({
+    ...rowToApi(summary.rows[0]),
+    bookingStatusBreakdown: Object.fromEntries(breakdown.rows.map((row) => [row.status, row.count])),
+    recentBookings,
+    topVendors,
   });
-  await clearServiceCache(service);
-  res.json(decorateService(service));
-});
-
-router.delete('/vendor/services/:id', requireRole('vendor', 'admin'), async (req, res) => {
-  const index = services.findIndex((s) => s.id === req.params.id);
-  if (index === -1) return res.status(404).json({ message: 'Service not found' });
-  const [removed] = services.splice(index, 1);
-  await clearServiceCache(removed);
-  res.json(decorateService(removed));
-});
-
-router.get('/vendor/staff', requireRole('vendor', 'admin'), (req: any, res) => {
-  const vendorId = resolveVendorId(req);
-  res.json(staff.filter((s) => s.vendorId === vendorId));
-});
-
-router.post('/vendor/staff', requireRole('vendor', 'admin'), (req: any, res) => {
-  const entry = { id: uid('staff'), vendorId: resolveVendorId(req), ...req.body, active: req.body.active !== false, createdAt: now(), updatedAt: now() };
-  staff.push(entry);
-  res.status(201).json(entry);
-});
-
-router.patch('/vendor/staff/:id', requireRole('vendor', 'admin'), (req, res) => {
-  const entry = staff.find((s) => s.id === req.params.id);
-  if (!entry) return res.status(404).json({ message: 'Staff member not found' });
-  Object.assign(entry, req.body, { updatedAt: now() });
-  res.json(entry);
-});
-
-router.delete('/vendor/staff/:id', requireRole('vendor', 'admin'), (req, res) => {
-  const index = staff.findIndex((s) => s.id === req.params.id);
-  if (index === -1) return res.status(404).json({ message: 'Staff member not found' });
-  const [removed] = staff.splice(index, 1);
-  res.json(removed);
-});
-
-router.get('/vendor/promotions', requireRole('vendor', 'admin'), (req: any, res) => {
-  const vendorId = resolveVendorId(req);
-  res.json(promotions.filter((p) => p.vendorId === vendorId));
-});
-
-router.post('/vendor/promotions', requireRole('vendor', 'admin'), (req: any, res) => {
-  const entry = { id: uid('promo'), vendorId: resolveVendorId(req), ...req.body, createdAt: now(), updatedAt: now() };
-  promotions.push(entry);
-  res.status(201).json(entry);
-});
-
-router.patch('/vendor/promotions/:id', requireRole('vendor', 'admin'), (req, res) => {
-  const entry = promotions.find((p) => p.id === req.params.id);
-  if (!entry) return res.status(404).json({ message: 'Promotion not found' });
-  Object.assign(entry, req.body, { updatedAt: now() });
-  res.json(entry);
-});
-
-router.delete('/vendor/promotions/:id', requireRole('vendor', 'admin'), (req, res) => {
-  const index = promotions.findIndex((p) => p.id === req.params.id);
-  if (index === -1) return res.status(404).json({ message: 'Promotion not found' });
-  const [removed] = promotions.splice(index, 1);
-  res.json(removed);
-});
-
-router.get('/vendor/kyv', requireRole('vendor', 'admin'), (req: any, res) => {
-  const vendorId = resolveVendorId(req);
-  res.json(kyvDocuments.filter((k) => k.vendorId === vendorId));
-});
-
-router.post('/vendor/kyv', requireRole('vendor', 'admin'), (req: any, res) => {
-  const entry = { id: uid('kyv'), vendorId: resolveVendorId(req), ...req.body, status: 'pending', createdAt: now(), updatedAt: now() };
-  kyvDocuments.push(entry);
-  res.status(201).json(entry);
-});
+}));
 
 export default router;
