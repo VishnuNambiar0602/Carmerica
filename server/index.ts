@@ -32,6 +32,14 @@ app.use(requestLogger);
 
 // Routes
 app.use('/api', apiRoutes);
+ 
+ // Root route for direct browser checks
+ app.get('/', (req, res) => {
+   res.status(200).json({
+     status: 'ok',
+     message: 'CarServ backend is running. Use /api/* for application endpoints.',
+   });
+ });
 
 // Basic health check
 app.get('/health', async (_req, res) => {

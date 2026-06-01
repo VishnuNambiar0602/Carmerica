@@ -1,14 +1,54 @@
-import React from 'react';
-import { Search, MapPin, Star, Clock, Filter, ChevronDown, Map, List, Check, Info, Sparkles, ShieldCheck, TrendingDown, AlertCircle, Zap, Shield } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Search, MapPin, Star, Clock, Filter, ChevronDown, Map, List, Check, Info, Sparkles, ShieldCheck, TrendingDown, AlertCircle, Zap, Shield, Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '../../lib/utils';
 
 const SearchResults = () => {
   const navigate = useNavigate();
-  const [viewMode, setViewMode] = React.useState<'list' | 'map'>('list');
-  const [garages, setGarages] = React.useState<any[]>([]);
+  const [viewMode, setViewMode] = useState<'list' | 'map'>('list');
+  const [garages, setGarages] = useState<any[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchAnalysis, setSearchAnalysis] = useState<any>(null);
 
-  React.useEffect(() => {
+  const performSmartSearch = async (query: string) => {
+    if (!query) return;
+    setIsSearching(true);
+    try {
+      const response = await fetch('/api/ai/smart-search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query })
+      });
+      const data = await response.json();
+      
+      // Transform simplified database garages to UI format
+      const transformed = data.garages.map((g: any, i: number) => ({
+        id: g.id,
+        name: g.name,
+        location: g.location.split(',')[0],
+        distance: `${(i + 1) * 1.5} miles away`,
+        rating: g.rating,
+        reviews: g.reviews,
+        price: g.services[0]?.price || 100,
+        marketPrice: (g.services[0]?.price || 100) + 15,
+        services: g.services.map((s: any) => s.name),
+        availability: 'Available Today',
+        image: `https://picsum.photos/seed/garage${g.id}/400/250`,
+        trustScore: 90 + i,
+        isFairValue: true,
+      }));
+
+      setGarages(transformed);
+      setSearchAnalysis(data.analysis);
+    } catch (err) {
+      console.error('Smart search failed', err);
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  useEffect(() => {
     const load = async () => {
       try {
         const res = await fetch('/api/services');
@@ -112,13 +152,50 @@ const SearchResults = () => {
           <input type="text" defaultValue="Los Angeles, CA" className="bg-transparent outline-none text-sm w-full font-medium" />
         </div>
         <div className="grow flex items-center bg-gray-50 rounded-xl px-4 py-3 w-full border border-transparent focus-within:border-blue-200 transition-all">
-          <Sparkles className="h-4 w-4 text-red-600 mr-3" />
-          <input type="text" placeholder="Ask AI: 'Best value for SUV brake repair'" className="bg-transparent outline-none text-sm w-full font-medium placeholder:text-gray-400" />
+          <Sparkles className={cn("h-4 w-4 mr-3", isSearching ? "text-blue-500 animate-spin" : "text-red-600")} />
+          <input 
+            type="text" 
+            placeholder="Ask AI: 'My car is making a squeaking sound'" 
+            className="bg-transparent outline-none text-sm w-full font-medium placeholder:text-gray-400"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && performSmartSearch(searchQuery)}
+          />
         </div>
-        <button className="bg-[#0071c2] text-white px-8 py-3 rounded-xl font-bold text-sm hover:bg-[#005999] w-full md:w-auto transition-all active:scale-95 shadow-lg shadow-blue-900/10">
+        <button 
+          onClick={() => performSmartSearch(searchQuery)}
+          disabled={isSearching}
+          className="bg-[#0071c2] text-white px-8 py-3 rounded-xl font-bold text-sm hover:bg-[#005999] w-full md:w-auto transition-all active:scale-95 shadow-lg shadow-blue-900/10 flex items-center justify-center gap-2"
+        >
+          {isSearching && <Loader2 className="h-4 w-4 animate-spin" />}
           Update Search
         </button>
       </div>
+
+      {searchAnalysis && (
+        <div className="mb-8 p-6 bg-blue-50 border border-blue-100 rounded-3xl animate-in fade-in slide-in-from-top-4">
+          <div className="flex items-start gap-4">
+            <div className="p-3 bg-white rounded-2xl shadow-sm">
+              <Sparkles className="h-6 w-6 text-blue-600" />
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-blue-900">AI Diagnosis: {searchAnalysis.category} Needed</h3>
+              <p className="text-blue-700/80 text-sm mt-1 leading-relaxed">
+                {searchAnalysis.reasoning}
+              </p>
+              <div className="mt-3 flex items-center gap-2">
+                <span className="text-[10px] font-black uppercase tracking-widest text-blue-400">Status:</span>
+                <span className={cn(
+                  "text-xs font-bold px-3 py-1 rounded-full",
+                  searchAnalysis.urgency === 'high' ? "bg-red-100 text-red-700" : "bg-blue-100 text-blue-700"
+                )}>
+                  Urgency: {searchAnalysis.urgency}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="flex flex-col lg:flex-row gap-8">
         {/* Filters Sidebar */}

@@ -182,3 +182,24 @@ export function getGaragesByServiceType(serviceType: string): Garage[] {
     return [];
   }
 }
+
+/**
+ * Returns the vehicles registered to the given user ID.
+ */
+export function getUserVehicles(userId: string) {
+  // Demo mock for user-1 (matches SmartGarage data)
+  if (userId === 'user-1') {
+    return [
+      { 
+        id: 1, 
+        make: 'Toyota', 
+        model: 'Camry', 
+        year: 2022, 
+        mileage: 24500, 
+        lastServiceDate: '2025-10-12', 
+        lastServiceType: 'Oil Change' 
+      }
+    ];
+  }
+  return [];
+}
