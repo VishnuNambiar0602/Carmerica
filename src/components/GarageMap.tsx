@@ -11,6 +11,10 @@ const LeafletMapContainer = MapContainer as any;
 const LeafletTileLayer = TileLayer as any;
 const LeafletMarker = Marker as any;
 const LeafletCircleMarker = CircleMarker as any;
+const LeafletMapContainer = MapContainer as React.ComponentType<any>;
+const LeafletTileLayer = TileLayer as React.ComponentType<any>;
+const LeafletMarker = Marker as React.ComponentType<any>;
+const LeafletCircleMarker = CircleMarker as React.ComponentType<any>;
 
 interface GarageMapProps {
   onClose?: () => void;
