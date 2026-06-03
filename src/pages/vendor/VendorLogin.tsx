@@ -1,10 +1,12 @@
 import React from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Briefcase, Mail, Lock, Eye, EyeOff, ShieldCheck, ArrowRight, Building2 } from 'lucide-react';
+import { Briefcase, Mail, Lock, Eye, EyeOff, ShieldCheck, ArrowRight, Building2, Loader2 } from 'lucide-react';
 
 const VendorLogin = () => {
   const navigate = useNavigate();
   const [showPassword, setShowPassword] = React.useState(false);
+  const [loading, setLoading] = React.useState(false);
+  const [error, setError] = React.useState('');
   const [formData, setFormData] = React.useState({
     email: '',
     password: ''
@@ -12,6 +14,8 @@ const VendorLogin = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setLoading(true);
+    setError('');
     try {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
@@ -20,16 +24,19 @@ const VendorLogin = () => {
       });
       const data = await res.json();
       if (res.ok) {
-        localStorage.setItem('authToken', data.token);
-        localStorage.setItem('userRole', 'vendor');
-        localStorage.setItem('userEmail', formData.email);
-        navigate('/vendor/dashboard');
+        localStorage.setItem('token', data.token);
+        localStorage.setItem('user', JSON.stringify(data.user));
+        if (data.vendor) localStorage.setItem('vendor', JSON.stringify(data.vendor));
+        const params = new URLSearchParams(window.location.search);
+        const redirect = params.get('redirect') || '/vendor/dashboard';
+        navigate(redirect);
       } else {
-        alert(data.message || 'Login failed');
+        setError(data.message || 'Login failed');
       }
-    } catch (err) {
-      console.error(err);
-      alert('Network error');
+    } catch {
+      setError('Network error');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -90,6 +97,12 @@ const VendorLogin = () => {
               Manage your garage listing and bookings.
             </p>
           </div>
+
+          {error && (
+            <div className="bg-red-50 border border-red-200 text-red-700 text-sm p-4 rounded-lg">
+              {error}
+            </div>
+          )}
 
           <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
             <div className="space-y-4">
@@ -157,9 +170,10 @@ const VendorLogin = () => {
             <div>
               <button
                 type="submit"
-                className="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-bold text-white bg-[#003580] hover:bg-[#00224f] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#003580] transition-colors"
+                disabled={loading}
+                className="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-bold text-white bg-[#003580] hover:bg-[#00224f] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#003580] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Sign In to Dashboard
+                {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : 'Sign In to Dashboard'}
               </button>
             </div>
           </form>

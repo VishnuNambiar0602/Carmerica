@@ -1,4 +1,5 @@
 import { GroqError, generate } from './groq.js';
+import { db } from './db.js';
 
 export type AgentType = 'team_lead' | 'bookings' | 'reviews' | 'maintenance' | 'support';
 export type RoutingIntent = 'bookings' | 'reviews' | 'maintenance' | 'general_support' | 'unclear';
@@ -84,37 +85,12 @@ const AGENT_CONFIGS: Record<AgentType, AgentConfig> = {
 const TEAM_LEAD_GREETING =
   "Hi there! I'm Jordan, your CarMerica support team lead. I can connect you with bookings, reviews, maintenance advice, or general support. What can we help you with today?";
 
-const demoBookings = [
-  { id: 'BK-1029', userId: 'user-1', garage: 'Elite Auto Care', date: 'Oct 12, 2026', time: '10:00 AM', service: 'Oil Change', car: 'Toyota Camry', status: 'In Progress', price: 89 },
-  { id: 'BK-1031', userId: 'user-1', garage: 'Precision Mechanics', date: 'Oct 12, 2026', time: '01:00 PM', service: 'General Service', car: 'Ford F-150', status: 'Confirmed', price: 189 },
-];
-
-const demoGarages = [
-  { name: 'Elite Auto Care', location: 'Downtown, Dubai', rating: 4.8, services: ['Oil Change', 'Brake Repair', 'Diagnostics'] },
-  { name: 'Precision Mechanics', location: 'Al Quoz, Dubai', rating: 4.6, services: ['General Service', 'Oil Change'] },
-  { name: 'The Garage Co.', location: 'Jumeirah, Dubai', rating: 4.5, services: ['AC Service', 'Electrical Repair'] },
-];
-
-const demoReviews = [
-  { user: 'John Doe', vendor: 'Elite Auto Care', rating: 5, comment: 'Excellent service and transparent costs.' },
-  { user: 'Sarah Smith', vendor: 'Precision Mechanics', rating: 4, comment: 'Good experience and strong brake repair.' },
-  { user: 'Mike Johnson', vendor: 'Elite Auto Care', rating: 2, comment: 'Service took longer than expected.' },
-];
-
 function intentToAgentType(intent: RoutingIntent): AgentType {
   if (intent === 'bookings') return 'bookings';
   if (intent === 'reviews') return 'reviews';
   if (intent === 'maintenance') return 'maintenance';
   if (intent === 'general_support') return 'support';
   return 'team_lead';
-}
-
-function agentTypeToIntent(agentType: AgentType): RoutingIntent {
-  if (agentType === 'bookings') return 'bookings';
-  if (agentType === 'reviews') return 'reviews';
-  if (agentType === 'maintenance') return 'maintenance';
-  if (agentType === 'support') return 'general_support';
-  return 'unclear';
 }
 
 function formatConversationHistory(history: ChatMessage[]) {
@@ -131,25 +107,37 @@ function inferIntent(text: string): RoutingIntent {
   return 'unclear';
 }
 
-function fetchDatabaseContext(agentType: AgentType, userId: string, userMessage: string) {
-  if (agentType === 'bookings') {
-    return JSON.stringify(demoBookings.filter((booking) => booking.userId === userId), null, 2);
-  }
+async function fetchDatabaseContext(agentType: AgentType, userId: string, userMessage: string): Promise<string> {
+  try {
+    if (agentType === 'bookings') {
+      const user = await db.findUserById(userId);
+      if (user) {
+        const bookings = await db.listBookings({ customerEmail: user.email });
+        return JSON.stringify(bookings.slice(0, 10), null, 2);
+      }
+      return 'No bookings found for this user.';
+    }
 
-  if (agentType === 'reviews') {
-    const mentionedGarage = demoGarages.find((garage) => userMessage.toLowerCase().includes(garage.name.toLowerCase()));
-    const reviews = mentionedGarage ? demoReviews.filter((review) => review.vendor === mentionedGarage.name) : demoReviews;
-    return JSON.stringify(reviews, null, 2);
-  }
+    if (agentType === 'reviews') {
+      const reviews = await db.listReviews();
+      const garages = await db.listGarages();
+      const mentionedGarage = garages.find((g) => userMessage.toLowerCase().includes(g.name.toLowerCase()));
+      const filtered = mentionedGarage ? reviews.filter((r) => r.garage_id === mentionedGarage.id) : reviews;
+      return JSON.stringify(filtered.slice(0, 10), null, 2);
+    }
 
-  if (agentType === 'maintenance') {
-    return JSON.stringify({
-      registeredVehicles: userId === 'user-1' ? [{ make: 'Toyota', model: 'Camry', year: 2022, mileage: 24500, lastServiceType: 'Oil Change' }] : [],
-      garages: demoGarages,
-    }, null, 2);
-  }
+    if (agentType === 'maintenance') {
+      const garages = await db.listGarages();
+      return JSON.stringify({
+        registeredVehicles: [{ note: 'Vehicle data from user profile — connect to service history for more detail.' }],
+        garages: garages.slice(0, 10),
+      }, null, 2);
+    }
 
-  return 'No specialist context required.';
+    return 'No specialist context required.';
+  } catch {
+    return 'Unable to fetch live data — using general knowledge.';
+  }
 }
 
 function buildSystemPrompt(activeAgentType: AgentType, conversationHistory: ChatMessage[], dbContext: string) {
@@ -179,12 +167,11 @@ function fallbackResponse(params: SendMessageParams): AgentResponse {
   const routingIntent = inferIntent(params.userMessage);
   const routedAgentType = routingIntent === 'unclear' ? activeAgentType : intentToAgentType(routingIntent);
   const config = AGENT_CONFIGS[routedAgentType];
-  const dbContext = fetchDatabaseContext(routedAgentType, params.userId, params.userMessage);
 
   let reply = TEAM_LEAD_GREETING;
-  if (routedAgentType === 'bookings') reply = `I'm Emily, the bookings specialist. I found this booking context for you:\n${dbContext}`;
-  if (routedAgentType === 'reviews') reply = `Hello, I'm Maya. Here are the latest review insights I can use:\n${dbContext}`;
-  if (routedAgentType === 'maintenance') reply = `Hi, I'm Sam. Based on your request, I recommend checking relevant service history and comparing these garage options:\n${dbContext}`;
+  if (routedAgentType === 'bookings') reply = "I'm Emily, the bookings specialist. Let me look up your booking details — could you share the booking ID or your registered email?";
+  if (routedAgentType === 'reviews') reply = "Hello, I'm Maya. I can help with reviews and ratings. Which garage or service would you like to review?";
+  if (routedAgentType === 'maintenance') reply = "Hi, I'm Sam. I can recommend maintenance services and garages. Tell me about your vehicle and what you need.";
   if (routedAgentType === 'support') reply = "Hi, I'm Riley. I can help with account, payment, refund, or platform issues. Please share the booking ID or account email so I can narrow this down.";
 
   return {
@@ -209,7 +196,7 @@ export async function sendAIMessage(params: SendMessageParams): Promise<AgentRes
 
   const inferred = inferIntent(params.userMessage);
   const activeAgentType = params.currentAgent || (inferred === 'unclear' ? 'team_lead' : intentToAgentType(inferred));
-  const dbContext = fetchDatabaseContext(activeAgentType, params.userId, params.userMessage);
+  const dbContext = await fetchDatabaseContext(activeAgentType, params.userId, params.userMessage);
   const systemPrompt = buildSystemPrompt(activeAgentType, params.conversationHistory, dbContext);
 
   try {
@@ -241,6 +228,7 @@ export function getAIStatus() {
     model: process.env.GROQ_MODEL || 'llama-3.1-8b-instant',
     configured,
     fallbackEnabled: true,
+    database: db.isSupabase ? 'supabase' : 'memory-backed',
     agents: Object.values(AGENT_CONFIGS).map(({ type, name, role }) => ({ type, name, role })),
   };
 }

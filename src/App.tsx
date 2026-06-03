@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate, Link } from 'react-ro
 import { CustomerLayout } from './components/layout/CustomerLayout';
 import { VendorLayout } from './components/layout/VendorLayout';
 import { AdminLayout } from './components/layout/AdminLayout';
+import { ProtectedRoute, VendorProtectedRoute, AdminProtectedRoute } from './components/ProtectedRoute';
 
 import ChatWidget from './components/ChatWidget';
 import GarageMap from './components/GarageMap';
@@ -45,6 +46,7 @@ import AdminVendorKYV from './pages/admin/AdminVendorKYV';
 import ForgotPassword from './pages/customer/ForgotPassword';
 import VendorForgotPassword from './pages/vendor/VendorForgotPassword';
 import VendorRegister from './pages/vendor/VendorRegister';
+import VendorGarageSetup from './pages/vendor/VendorGarageSetup';
 
 const SectionCard = ({ title, body, cta, to }: { title: string; body: string; cta: string; to: string }) => (
   <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-6">
@@ -165,12 +167,12 @@ function App() {
           <Route path="search" element={<SearchResults />} />
           <Route path="garage/:id" element={<GarageDetails />} />
           <Route path="package/:id" element={<PackageDetails />} />
-          <Route path="checkout" element={<Checkout />} />
+          <Route path="checkout" element={<ProtectedRoute><Checkout /></ProtectedRoute>} />
           <Route path="confirmation" element={<Confirmation />} />
-          <Route path="my-bookings" element={<MyBookings />} />
-          <Route path="smart-garage" element={<SmartGarage />} />
+          <Route path="my-bookings" element={<ProtectedRoute><MyBookings /></ProtectedRoute>} />
+          <Route path="smart-garage" element={<ProtectedRoute><SmartGarage /></ProtectedRoute>} />
           <Route path="garage-map" element={<GarageMapPage />} />
-          <Route path="profile" element={<Profile />} />
+          <Route path="profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
           <Route path="login" element={<Login />} />
           <Route path="forgot-password" element={<ForgotPassword />} />
           <Route path="offers" element={<Offers />} />
@@ -184,7 +186,7 @@ function App() {
         <Route path="/vendor/login" element={<VendorLogin />} />
         <Route path="/vendor/forgot-password" element={<VendorForgotPassword />} />
         <Route path="/vendor/register" element={<VendorRegister />} />
-        <Route path="/vendor" element={<VendorLayout />}>
+        <Route path="/vendor" element={<VendorProtectedRoute><VendorLayout /></VendorProtectedRoute>}>
           <Route index element={<Navigate to="/vendor/dashboard" replace />} />
           <Route path="dashboard" element={<VendorDashboard />} />
           <Route path="bookings" element={<VendorBookings />} />
@@ -197,12 +199,13 @@ function App() {
           <Route path="promotions" element={<VendorPromotions />} />
           <Route path="messages" element={<VendorMessages />} />
           <Route path="reports" element={<VendorReports />} />
+          <Route path="garage-setup" element={<VendorGarageSetup />} />
         </Route>
 
 
         {/* Admin Routes */}
         <Route path="/admin/login" element={<AdminLogin />} />
-        <Route path="/admin" element={<AdminLayout />}>
+        <Route path="/admin" element={<AdminProtectedRoute><AdminLayout /></AdminProtectedRoute>}>
           <Route index element={<Navigate to="/admin/overview" replace />} />
           <Route path="overview" element={<AdminOverview />} />
           <Route path="users" element={<AdminUsers />} />

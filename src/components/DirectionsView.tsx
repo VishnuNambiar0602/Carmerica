@@ -5,10 +5,6 @@ import { X, Navigation, Clock, MapPin, AlertCircle } from 'lucide-react';
 import type { Garage } from '../data/garages';
 import { GarageLocator } from '../services/GarageLocator';
 
-const LeafletMapContainer = MapContainer as any;
-const LeafletTileLayer = TileLayer as any;
-const LeafletMarker = Marker as any;
-const LeafletPolyline = Polyline as any;
 const LeafletMapContainer = MapContainer as React.ComponentType<any>;
 const LeafletTileLayer = TileLayer as React.ComponentType<any>;
 const LeafletMarker = Marker as React.ComponentType<any>;

@@ -31,7 +31,7 @@ export function getOnboardingResponse(
         recommendedActions: ['Add your car details in Profile', 'Save payment method for one-click checkout'],
         quickLinks: [
           { label: 'Search garages', path: '/search' },
-          { label: 'My bookings', path: '/customer/bookings' },
+          { label: 'My bookings', path: '/my-bookings' },
         ],
       };
     }

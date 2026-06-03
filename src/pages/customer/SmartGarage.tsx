@@ -21,6 +21,8 @@ import {
 import { cn } from '../../lib/utils';
 
 const SmartGarage = () => {
+  const [vehicles, setVehicles] = useState<any[]>([]);
+  const [loadingVehicles, setLoadingVehicles] = useState(true);
   const [activeVehicle, setActiveVehicle] = useState(0);
   const [isUploading, setIsUploading] = useState(false);
   const [isDiagnosing, setIsDiagnosing] = useState(false);
@@ -34,12 +36,45 @@ const SmartGarage = () => {
     keywords?: string[];
   }>(null);
 
-  const vehicles = [
-    { id: 1, make: 'Toyota', model: 'Camry', year: 2022, vin: '4T1BF1FKXNU******', mileage: 24500, status: 'Healthy', lastServiceDate: '2025-10-12', lastServiceType: 'Oil Change' },
-    { id: 2, make: 'Tesla', model: 'Model 3', year: 2023, vin: '5YJ3E1EBXPF******', mileage: 12200, status: 'Service Due', lastServiceDate: '2026-01-15', lastServiceType: 'Tire Rotation' }
-  ];
+  // Modal State
+  const [showModal, setShowModal] = useState(false);
+  const [make, setMake] = useState('');
+  const [model, setModel] = useState('');
+  const [year, setYear] = useState('');
+  const [color, setColor] = useState('');
+  const [fuelType, setFuelType] = useState('Petrol');
+  const [mileage, setMileage] = useState('');
+  const [vin, setVin] = useState('');
+  const [isDecoding, setIsDecoding] = useState(false);
+  const [modalError, setModalError] = useState('');
+  const [decodeSuccess, setDecodeSuccess] = useState('');
+  const [tilt, setTilt] = useState({ x: 0, y: 0 });
+
+  const fetchVehicles = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const headers: Record<string, string> = {};
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      const res = await fetch('/api/vehicles', { headers });
+      if (res.ok) {
+        const data = await res.json();
+        setVehicles(data);
+      }
+    } catch (err) {
+      console.error('Failed to fetch vehicles:', err);
+    } finally {
+      setLoadingVehicles(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchVehicles();
+  }, []);
 
   const handleDiagnose = async () => {
+    if (!vehicles || vehicles.length === 0 || !vehicles[activeVehicle]) return;
     setIsDiagnosing(true);
     const vehicle = vehicles[activeVehicle];
     try {
@@ -51,8 +86,8 @@ const SmartGarage = () => {
           model: vehicle.model,
           year: vehicle.year,
           mileage: vehicle.mileage,
-          lastServiceDate: vehicle.lastServiceDate,
-          lastServiceType: vehicle.lastServiceType
+          lastServiceDate: vehicle.lastServiceDate || vehicle.last_service_date || '',
+          lastServiceType: vehicle.lastServiceType || vehicle.last_service_type || ''
         })
       });
       const data = await response.json();
@@ -64,8 +99,75 @@ const SmartGarage = () => {
     }
   };
 
+  const handleDecodeVin = async () => {
+    if (vin.length !== 17) {
+      setModalError('VIN must be exactly 17 characters');
+      return;
+    }
+    setIsDecoding(true);
+    setModalError('');
+    setDecodeSuccess('');
+    try {
+      const res = await fetch(`/api/vehicles/decode-vin/${encodeURIComponent(vin)}`);
+      const data = await res.json();
+      if (res.ok) {
+        setMake(data.make || '');
+        setModel(data.model || '');
+        if (data.year) setYear(String(data.year));
+        if (data.fuelType) setFuelType(data.fuelType);
+        setDecodeSuccess('VIN decoded successfully!');
+      } else {
+        setModalError(data.message || 'VIN decode failed');
+      }
+    } catch (err) {
+      setModalError('Failed to decode VIN');
+    } finally {
+      setIsDecoding(false);
+    }
+  };
+
+  const handleAddVehicleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!make.trim() || !model.trim() || !year.trim()) {
+      setModalError('Make, model, and year are required');
+      return;
+    }
+    const token = localStorage.getItem('token');
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json'
+    };
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    try {
+      const res = await fetch('/api/vehicles', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ make, model, year, mileage, vin, color, fuelType })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setVehicles(prev => [data, ...prev]);
+        setActiveVehicle(0);
+        setShowModal(false);
+        setMake('');
+        setModel('');
+        setYear('');
+        setColor('');
+        setFuelType('Petrol');
+        setMileage('');
+        setVin('');
+        setModalError('');
+        setDecodeSuccess('');
+      } else {
+        setModalError(data.message || 'Failed to add vehicle');
+      }
+    } catch (err) {
+      setModalError('Network error');
+    }
+  };
+
   useEffect(() => {
-    // Re-diagnose when switching cars
     setDiagnosis(null);
   }, [activeVehicle]);
 
@@ -116,7 +218,10 @@ const SmartGarage = () => {
           </h1>
           <p className="text-gray-500 mt-2">AI-powered vehicle lifecycle management and part identification.</p>
         </div>
-        <button className="bg-red-600 text-white px-6 py-3 rounded-2xl font-bold hover:bg-red-700 transition-all shadow-xl shadow-red-100 flex items-center">
+        <button 
+          onClick={() => setShowModal(true)}
+          className="bg-red-600 text-white px-6 py-3 rounded-2xl font-bold hover:bg-red-700 transition-all shadow-xl shadow-red-100 flex items-center cursor-pointer select-none"
+        >
           <Plus className="h-5 w-5 mr-2" /> Add New Vehicle
         </button>
       </div>
@@ -133,37 +238,48 @@ const SmartGarage = () => {
               <p className="text-xs text-gray-500 mt-1">Ensuring 100% part compatibility</p>
             </div>
             <div className="p-4 space-y-3">
-              {vehicles.map((v, i) => (
-                <button 
-                  key={v.id}
-                  onClick={() => setActiveVehicle(i)}
-                  className={cn(
-                    "w-full p-4 rounded-2xl border transition-all text-left group",
-                    activeVehicle === i 
-                      ? "border-red-600 bg-red-50/50 shadow-md" 
-                      : "border-gray-100 hover:border-red-200 hover:bg-gray-50"
-                  )}
-                >
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <p className={cn("font-bold", activeVehicle === i ? "text-red-600" : "text-gray-900")}>
-                        {v.year} {v.make} {v.model}
-                      </p>
-                      <p className="text-xs text-gray-500 mt-1 font-mono">{v.vin}</p>
+              {loadingVehicles ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="animate-spin h-6 w-6 text-red-600" />
+                </div>
+              ) : vehicles.length === 0 ? (
+                <div className="text-center py-12">
+                  <p className="text-sm text-gray-400 font-bold uppercase tracking-widest">No Vehicles Added</p>
+                  <p className="text-xs text-gray-400 mt-1">Add a vehicle to enable AI diagnostics</p>
+                </div>
+              ) : (
+                vehicles.map((v, i) => (
+                  <button 
+                    key={v.id}
+                    onClick={() => setActiveVehicle(i)}
+                    className={cn(
+                      "w-full p-4 rounded-2xl border transition-all text-left group cursor-pointer",
+                      activeVehicle === i 
+                        ? "border-red-600 bg-red-50/50 shadow-md" 
+                        : "border-gray-100 hover:border-red-200 hover:bg-gray-50"
+                    )}
+                  >
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <p className={cn("font-bold", activeVehicle === i ? "text-red-600" : "text-gray-900")}>
+                          {v.year} {v.make} {v.model}
+                        </p>
+                        <p className="text-xs text-gray-500 mt-1 font-mono">{v.vin || 'No VIN'}</p>
+                      </div>
+                      <span className={cn(
+                        "text-[10px] font-bold px-2 py-1 rounded-full uppercase tracking-wider",
+                        v.status === 'Healthy' ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"
+                      )}>
+                        {v.status || 'Healthy'}
+                      </span>
                     </div>
-                    <span className={cn(
-                      "text-[10px] font-bold px-2 py-1 rounded-full uppercase tracking-wider",
-                      v.status === 'Healthy' ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"
-                    )}>
-                      {v.status}
-                    </span>
-                  </div>
-                  <div className="mt-4 flex items-center justify-between text-xs font-bold text-gray-400">
-                    <span className="flex items-center"><Clock className="h-3 w-3 mr-1" /> {v.mileage}</span>
-                    <ChevronRight className={cn("h-4 w-4 transition-transform", activeVehicle === i && "translate-x-1")} />
-                  </div>
-                </button>
-              ))}
+                    <div className="mt-4 flex items-center justify-between text-xs font-bold text-gray-400">
+                      <span className="flex items-center"><Clock className="h-3 w-3 mr-1" /> {v.mileage} km</span>
+                      <ChevronRight className={cn("h-4 w-4 transition-transform", activeVehicle === i && "translate-x-1")} />
+                    </div>
+                  </button>
+                ))
+              )}
             </div>
           </div>
 
@@ -340,7 +456,7 @@ const SmartGarage = () => {
                   <Activity className="h-5 w-5 mr-2 text-red-500" />
                   Predictive Health Scan
                 </h2>
-                <p className="text-sm text-gray-500 mt-1">AI-driven diagnostics based on your {vehicles[activeVehicle].make}'s mileage.</p>
+                <p className="text-sm text-gray-500 mt-1">AI-driven diagnostics based on your {vehicles[activeVehicle]?.make || 'vehicle'}'s mileage.</p>
               </div>
               {!diagnosis && (
                 <button 
@@ -432,8 +548,180 @@ const SmartGarage = () => {
           </div>
 
           {/* AI Maintenance Builder */}
+    </div>
+
+      {showModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center p-4 z-50 animate-in fade-in duration-300">
+          <div 
+            onMouseMove={(e) => {
+              const card = e.currentTarget;
+              const box = card.getBoundingClientRect();
+              const x = e.clientX - box.left - box.width / 2;
+              const y = e.clientY - box.top - box.height / 2;
+              const factorX = 10 / (box.height / 2);
+              const factorY = 10 / (box.width / 2);
+              setTilt({ x: -y * factorX, y: x * factorY });
+            }}
+            onMouseLeave={() => setTilt({ x: 0, y: 0 })}
+            style={{
+              transform: `perspective(1000px) rotateX(${tilt.x}deg) rotateY(${tilt.y}deg)`,
+              transition: 'transform 0.1s ease-out',
+              transformStyle: 'preserve-3d',
+            }}
+            className="bg-white rounded-[2.5rem] border border-gray-100 shadow-2xl overflow-hidden max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+          >
+            {/* Header decoration */}
+            <div className="bg-gradient-to-r from-red-600 to-red-700 p-8 text-white relative">
+              <h2 className="text-2xl font-bold flex items-center">
+                <Car className="h-6 w-6 mr-3" />
+                Add New Vehicle
+              </h2>
+              <p className="text-red-100 mt-1">Enter your vehicle details or decode your VIN to auto-populate fields.</p>
+              <button 
+                type="button"
+                onClick={() => setShowModal(false)}
+                className="absolute top-6 right-6 p-2 bg-white/10 hover:bg-white/20 rounded-full transition-colors cursor-pointer"
+              >
+                <Plus className="h-5 w-5 rotate-45" />
+              </button>
+            </div>
+
+            <form onSubmit={handleAddVehicleSubmit} className="p-8 space-y-6">
+              {modalError && (
+                <div className="bg-red-50 border border-red-200 text-red-700 text-sm p-4 rounded-2xl flex items-center space-x-3">
+                  <AlertCircle className="h-5 w-5 shrink-0" />
+                  <span>{modalError}</span>
+                </div>
+              )}
+              {decodeSuccess && (
+                <div className="bg-green-50 border border-green-200 text-green-700 text-sm p-4 rounded-2xl flex items-center space-x-3">
+                  <CheckCircle2 className="h-5 w-5 shrink-0" />
+                  <span>{decodeSuccess}</span>
+                </div>
+              )}
+
+              {/* VIN Decode Section */}
+              <div className="bg-gray-50 p-6 rounded-3xl border border-gray-100 space-y-3">
+                <label className="text-xs font-bold text-gray-400 uppercase tracking-widest">Decode via VIN</label>
+                <div className="flex gap-3">
+                  <input
+                    type="text"
+                    placeholder="Enter 17-character VIN"
+                    value={vin}
+                    onChange={(e) => {
+                      setVin(e.target.value.toUpperCase());
+                      setModalError('');
+                      setDecodeSuccess('');
+                    }}
+                    maxLength={17}
+                    className="grow p-4 bg-white border border-gray-200 rounded-2xl focus:border-red-600 outline-none font-mono uppercase"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleDecodeVin}
+                    disabled={vin.length !== 17 || isDecoding}
+                    className="bg-black text-white px-6 py-4 rounded-2xl font-bold hover:bg-gray-800 disabled:opacity-50 transition-all flex items-center gap-2 cursor-pointer"
+                  >
+                    {isDecoding && <Loader2 className="h-4 w-4 animate-spin" />}
+                    Decode
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-gray-400 uppercase tracking-widest">Make *</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Toyota"
+                    value={make}
+                    onChange={(e) => setMake(e.target.value)}
+                    className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl focus:border-red-600 outline-none"
+                    required
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-gray-400 uppercase tracking-widest">Model *</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Camry"
+                    value={model}
+                    onChange={(e) => setModel(e.target.value)}
+                    className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl focus:border-red-600 outline-none"
+                    required
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-gray-400 uppercase tracking-widest">Year *</label>
+                  <input
+                    type="number"
+                    placeholder="e.g. 2022"
+                    value={year}
+                    onChange={(e) => setYear(e.target.value)}
+                    className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl focus:border-red-600 outline-none"
+                    required
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-gray-400 uppercase tracking-widest">Current Mileage (km)</label>
+                  <input
+                    type="number"
+                    placeholder="e.g. 24500"
+                    value={mileage}
+                    onChange={(e) => setMileage(e.target.value)}
+                    className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl focus:border-red-600 outline-none"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-gray-400 uppercase tracking-widest">Color</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. White"
+                    value={color}
+                    onChange={(e) => setColor(e.target.value)}
+                    className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl focus:border-red-600 outline-none"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-gray-400 uppercase tracking-widest">Fuel Type</label>
+                  <select
+                    value={fuelType}
+                    onChange={(e) => setFuelType(e.target.value)}
+                    className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl focus:border-red-600 outline-none appearance-none"
+                  >
+                    <option value="Petrol">Petrol</option>
+                    <option value="Diesel">Diesel</option>
+                    <option value="Electric">Electric</option>
+                    <option value="Hybrid">Hybrid</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="pt-6 border-t border-gray-50 flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowModal(false)}
+                  className="px-6 py-4 border border-gray-200 rounded-2xl font-bold hover:bg-gray-50 transition-all cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="bg-red-600 text-white px-8 py-4 rounded-2xl font-bold hover:bg-red-700 transition-all shadow-xl shadow-red-100 flex items-center gap-2 active:scale-95 cursor-pointer"
+                >
+                  Save Vehicle
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
-      </div>
+      )}
+    </div>
     </div>
   );
 };

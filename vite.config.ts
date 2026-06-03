@@ -8,9 +8,7 @@ export default defineConfig(({mode}) => {
   const backendPort = env.PORT || '5000';
   return {
     plugins: [react(), tailwindcss()],
-    define: {
-      'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
-    },
+
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),

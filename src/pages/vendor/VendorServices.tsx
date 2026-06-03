@@ -22,17 +22,25 @@ const VendorServices = () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           serviceName: service.name,
-          location: 'Dubai Marina', // Example location
+          location: 'Dubai Marina',
           competitorPrices: [service.price * 0.9, service.price * 1.1, service.price * 1.05],
           currentPrice: service.price,
           demandLevel: 'high',
           garageRating: 4.8
         })
       });
+      if (!response.ok) throw new Error('API returned ' + response.status);
       const data = await response.json();
       setRecommendation({ ...data, serviceId: service.id });
     } catch (error) {
       console.error('Optimization failed', error);
+      setRecommendation({
+        recommendedPrice: service.price,
+        marketPosition: 'Market Average',
+        reasoning: 'Unable to fetch AI recommendation. Using current price as baseline.',
+        suggestedPromotion: null,
+        serviceId: service.id
+      });
     } finally {
       setOptimizingId(null);
     }

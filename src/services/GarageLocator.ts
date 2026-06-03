@@ -5,8 +5,8 @@ export interface UserLocation {
   lng: number;
 }
 
-// Demo mode - set to true to use dummy San Francisco location
-const DEMO_MODE = true;
+// Demo mode - set to true to use dummy San Francisco location for development
+const DEMO_MODE = process.env.NODE_ENV === 'development';
 
 // Dummy San Francisco location for testing (when not in user's actual location)
 const DUMMY_LOCATION: UserLocation = {

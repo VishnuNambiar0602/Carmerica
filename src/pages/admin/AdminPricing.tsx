@@ -16,23 +16,28 @@ const AdminPricing = () => {
   const handleOptimizeRule = async (rule: any) => {
     setOptimizingId(rule.id);
     try {
-      // Admin optimization context: Balancing platform revenue vs vendor satisfaction
       const response = await fetch('/api/ai/optimize-price', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           serviceName: rule.name,
           location: 'Global Platform',
-          competitorPrices: [10, 12, 15, 20], // Competitor commission rates
+          competitorPrices: [10, 12, 15, 20],
           currentPrice: parseFloat(rule.value),
           demandLevel: 'high',
-          garageRating: 4.5 // Avg platform rating
+          garageRating: 4.5
         })
       });
+      if (!response.ok) throw new Error('API returned ' + response.status);
       const data = await response.json();
       setRecommendation(data);
     } catch (error) {
       console.error('Optimization failed', error);
+      setRecommendation({
+        recommendedPrice: parseFloat(rule.value),
+        marketPosition: 'Current Rate',
+        reasoning: 'Unable to fetch AI strategy at this time. Keeping current rate as baseline.'
+      });
     } finally {
       setOptimizingId(null);
     }

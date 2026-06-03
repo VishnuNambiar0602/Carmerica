@@ -24,6 +24,13 @@ import { cn } from '../../lib/utils';
 
 const Sidebar = ({ isOpen, setIsOpen }: { isOpen: boolean; setIsOpen: (val: boolean) => void }) => {
   const location = useLocation();
+  
+  // Check if user is authenticated
+  const isAuthenticated = () => {
+    if (typeof window === 'undefined') return false;
+    const token = localStorage.getItem('token');
+    return !!token;
+  };
 
   const menuItems = [
     { name: 'Overview', icon: LayoutDashboard, path: '/admin/overview' },
@@ -86,13 +93,27 @@ const Sidebar = ({ isOpen, setIsOpen }: { isOpen: boolean; setIsOpen: (val: bool
           </nav>
 
           <div className="p-4 border-t border-[#333333]">
-            <Link 
-              to="/admin/login" 
-              className="flex items-center space-x-3 px-4 py-3 rounded-lg text-sm font-medium text-white/60 hover:bg-[#333333] hover:text-white transition-colors"
-            >
-              <LogOut className="h-5 w-5" />
-              <span>Log Out</span>
-            </Link>
+            {isAuthenticated() ? (
+              <button 
+                onClick={() => {
+                  localStorage.removeItem('token');
+                  localStorage.removeItem('user');
+                  window.location.reload();
+                }}
+                className="flex items-center space-x-3 px-4 py-3 rounded-lg text-sm font-medium text-white/60 hover:bg-[#333333] hover:text-white transition-colors"
+              >
+                <LogOut className="h-5 w-5" />
+                <span>Log Out</span>
+              </button>
+            ) : (
+              <Link 
+                to="/admin/login" 
+                className="flex items-center space-x-3 px-4 py-3 rounded-lg text-sm font-medium text-white/60 hover:bg-[#333333] hover:text-white transition-colors"
+              >
+                <LogOut className="h-5 w-5" />
+                <span>Log Out</span>
+              </Link>
+            )}
           </div>
         </div>
       </aside>
@@ -101,6 +122,13 @@ const Sidebar = ({ isOpen, setIsOpen }: { isOpen: boolean; setIsOpen: (val: bool
 };
 
 const Header = ({ setIsOpen }: { setIsOpen: (val: boolean) => void }) => {
+  // Check if user is authenticated
+  const isAuthenticated = () => {
+    if (typeof window === 'undefined') return false;
+    const token = localStorage.getItem('token');
+    return !!token;
+  };
+
   return (
     <header className="bg-white border-b border-gray-200 h-16 sticky top-0 z-30 flex items-center justify-between px-4 md:px-8">
       <div className="flex items-center">
@@ -110,7 +138,13 @@ const Header = ({ setIsOpen }: { setIsOpen: (val: boolean) => void }) => {
         >
           <Menu className="h-6 w-6" />
         </button>
-        <h1 className="text-xl font-bold text-gray-800 hidden md:block">Platform Administration</h1>
+        {isAuthenticated() ? (
+          <h1 className="text-xl font-bold text-gray-800 hidden md:block">Platform Administration</h1>
+        ) : (
+          <Link to="/admin/login" className="text-xl font-bold text-gray-800 hidden md:block">
+            AdminPanel
+          </Link>
+        )}
       </div>
 
       <div className="flex items-center space-x-4">
@@ -118,15 +152,23 @@ const Header = ({ setIsOpen }: { setIsOpen: (val: boolean) => void }) => {
           <Bell className="h-6 w-6" />
           <span className="absolute top-2 right-2 h-2 w-2 bg-red-500 rounded-full border-2 border-white"></span>
         </button>
-        <div className="flex items-center space-x-3 border-l pl-4 border-gray-200">
-          <div className="text-right hidden sm:block">
-            <p className="text-sm font-bold text-gray-800">Super Admin</p>
-            <p className="text-xs text-gray-500">System Access: Root</p>
+        {isAuthenticated() ? (
+          <div className="flex items-center space-x-3 border-l pl-4 border-gray-200">
+            <div className="text-right hidden sm:block">
+              <p className="text-sm font-bold text-gray-800">Super Admin</p>
+              <p className="text-xs text-gray-500">System Access: Root</p>
+            </div>
+            <div className="h-10 w-10 rounded-full bg-[#1a1a1a] text-white flex items-center justify-center font-bold">
+              SA
+            </div>
           </div>
-          <div className="h-10 w-10 rounded-full bg-[#1a1a1a] text-white flex items-center justify-center font-bold">
-            SA
+        ) : (
+          <div className="flex items-center space-x-3 border-l pl-4 border-gray-200">
+            <Link to="/admin/login" className="bg-white text-[#003580] px-4 py-2 rounded-sm text-sm font-bold hover:bg-gray-100 transition-colors">
+              Sign in
+            </Link>
           </div>
-        </div>
+        )}
       </div>
     </header>
   );

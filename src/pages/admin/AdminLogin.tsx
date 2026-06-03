@@ -1,10 +1,12 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ShieldAlert, Lock, Mail, Eye, EyeOff, Key } from 'lucide-react';
+import { ShieldAlert, Lock, Mail, Eye, EyeOff, Key, Loader2 } from 'lucide-react';
 
 const AdminLogin = () => {
   const navigate = useNavigate();
   const [showPassword, setShowPassword] = React.useState(false);
+  const [loading, setLoading] = React.useState(false);
+  const [error, setError] = React.useState('');
   const [formData, setFormData] = React.useState({
     email: '',
     password: '',
@@ -14,27 +16,28 @@ const AdminLogin = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (isSubmitting) return;
-    setIsSubmitting(true);
+    setLoading(true);
+    setError('');
     try {
       const res = await fetch('/api/admin/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: formData.email, password: formData.password, mfaCode: formData.mfaCode }),
+        body: JSON.stringify({ email: formData.email, password: formData.password })
       });
       const data = await res.json();
-      if (!res.ok) {
-        alert(data.message || 'Admin login failed');
-        return;
+      if (res.ok) {
+        localStorage.setItem('token', data.token);
+        localStorage.setItem('user', JSON.stringify(data.user));
+        const params = new URLSearchParams(window.location.search);
+        const redirect = params.get('redirect') || '/admin/overview';
+        navigate(redirect);
+      } else {
+        setError(data.message || 'Invalid credentials');
       }
-      localStorage.setItem('authToken', data.token);
-      localStorage.setItem('userRole', 'admin');
-      navigate('/admin/overview');
-    } catch (err) {
-      console.error(err);
-      alert('Network error');
+    } catch {
+      setError('Network error');
     } finally {
-      setIsSubmitting(false);
+      setLoading(false);
     }
   };
 
@@ -54,6 +57,12 @@ const AdminLogin = () => {
             Secure access for system administrators only.
           </p>
         </div>
+
+        {error && (
+          <div className="bg-red-50 border border-red-200 text-red-700 text-sm p-4 rounded-lg">
+            {error}
+          </div>
+        )}
 
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
           <div className="space-y-4">
@@ -137,9 +146,10 @@ const AdminLogin = () => {
           <div>
             <button
               type="submit"
-              className="w-full flex justify-center py-4 px-4 border border-transparent rounded-lg shadow-lg text-sm font-bold text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-all transform hover:scale-[1.02] active:scale-[0.98]"
+              disabled={loading}
+              className="w-full flex justify-center py-4 px-4 border border-transparent rounded-lg shadow-lg text-sm font-bold text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-all transform hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isSubmitting ? 'Authenticating...' : 'Authenticate & Enter'}
+              {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : 'Authenticate & Enter'}
             </button>
           </div>
         </form>

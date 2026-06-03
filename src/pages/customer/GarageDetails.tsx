@@ -20,7 +20,8 @@ import {
   TrendingDown,
   Shield,
   AlertCircle,
-  ArrowRight
+  ArrowRight,
+  Loader2
 } from 'lucide-react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import { cn } from '../../lib/utils';
@@ -29,59 +30,77 @@ const GarageDetails = () => {
   const navigate = useNavigate();
   const { id } = useParams();
   const [selectedService, setSelectedService] = React.useState<number | null>(null);
+  const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState<string | null>(null);
+  const [garage, setGarage] = React.useState<any>({
+    id: 0,
+    name: '',
+    location: '',
+    rating: 0,
+    reviews: 0,
+    trustScore: 0,
+    description: '',
+    images: [],
+    amenities: [],
+    services: [],
+    smartBundles: [],
+    trustMetrics: [],
+    reviews_list: [],
+  });
 
-  const garage = {
-    id: 1,
-    name: 'Elite Auto Care',
-    location: '123 Downtown St, Los Angeles, CA 90012',
-    rating: 4.8,
-    reviews: 1240,
-    trustScore: 98,
-    description: 'Elite Auto Care is a family-owned business with over 20 years of experience in the automotive industry. We specialize in high-end European and Asian vehicles, providing dealership-quality service at competitive prices.',
-    images: [
-      'https://picsum.photos/seed/garage1/800/500',
-      'https://picsum.photos/seed/garage2/400/300',
-      'https://picsum.photos/seed/garage3/400/300',
-      'https://picsum.photos/seed/garage4/400/300',
-    ],
-    amenities: ['Free WiFi', 'Waiting Lounge', 'Complimentary Coffee', 'Shuttle Service', 'Child Friendly'],
-    services: [
-      { id: 1, name: 'General Service', price: 350, marketPrice: 420, duration: '2-3 hours', description: 'Includes oil change, filter replacement, and 50-point inspection.', aiTag: 'Best Value' },
-      { id: 2, name: 'Full Service', price: 850, marketPrice: 1100, duration: '4-5 hours', description: 'Comprehensive service including engine tuning and fluid top-ups.', aiTag: 'Recommended' },
-      { id: 3, name: 'Brake Repair', price: 450, marketPrice: 550, duration: '1-2 hours', description: 'Replacement of brake pads and inspection of rotors.', aiTag: 'Safety First' },
-      { id: 4, name: 'AC Service', price: 250, marketPrice: 320, duration: '1 hour', description: 'Recharge refrigerant and clean filters.', aiTag: 'Summer Deal' }
-    ],
-    smartBundles: [
-      {
-        id: 'b1',
-        name: 'Essential Maintenance Bundle',
-        services: ['General Service', 'AC Performance Check', 'Tire Rotation'],
-        price: 499,
-        originalPrice: 650,
-        savings: 151,
-        tag: 'AI Suggested'
-      },
-      {
-        id: 'b2',
-        name: 'Road Trip Ready Kit',
-        services: ['Full Service', 'Brake Inspection', 'Battery Health Check'],
-        price: 999,
-        originalPrice: 1350,
-        savings: 351,
-        tag: 'Popular'
+  React.useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const [garageRes, servicesRes, reviewsRes] = await Promise.all([
+          fetch(`/api/garages/${id}`),
+          fetch(`/api/services?garageId=${id}`),
+          fetch(`/api/reviews?garageId=${id}`),
+        ]);
+        if (!garageRes.ok || !servicesRes.ok || !reviewsRes.ok) {
+          throw new Error('Failed to fetch garage data');
+        }
+        const garageData = await garageRes.json();
+        const services = await servicesRes.json();
+        const reviews = await reviewsRes.json();
+        setGarage({ ...garageData, services, reviews_list: reviews });
+      } catch (err: any) {
+        setError(err.message || 'Something went wrong');
+      } finally {
+        setLoading(false);
       }
-    ],
-    trustMetrics: [
-      { label: 'Mechanical Accuracy', score: 99 },
-      { label: 'Price Fairness', score: 97 },
-      { label: 'Customer Satisfaction', score: 98 },
-      { label: 'Verified Parts Used', score: 100 }
-    ],
-    reviews_list: [
-      { id: 1, user: 'John D.', rating: 5, comment: 'Excellent service! Very professional and transparent about the costs.', date: '2 days ago', verified: true },
-      { id: 2, user: 'Sarah M.', rating: 4, comment: 'Good experience, but the waiting lounge was a bit crowded.', date: '1 week ago', verified: true }
-    ]
-  };
+    };
+    if (id) {
+      fetchData();
+    } else {
+      setError('No garage ID provided');
+      setLoading(false);
+    }
+  }, [id]);
+
+  if (loading) {
+    return (
+      <div className="max-w-7xl mx-auto px-4 py-8 flex items-center justify-center min-h-[60vh]">
+        <div className="text-center">
+          <Loader2 className="h-12 w-12 animate-spin text-red-600 mx-auto mb-4" />
+          <p className="text-gray-500 font-medium">Loading garage details...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="max-w-7xl mx-auto px-4 py-8 flex items-center justify-center min-h-[60vh]">
+        <div className="text-center">
+          <AlertCircle className="h-12 w-12 text-red-600 mx-auto mb-4" />
+          <p className="text-gray-900 font-bold text-lg mb-2">Failed to load garage data</p>
+          <p className="text-gray-500">{error}</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
@@ -125,7 +144,7 @@ const GarageDetails = () => {
             <Share2 className="h-6 w-6" />
           </button>
           <button 
-            onClick={() => navigate('/checkout')}
+            onClick={() => navigate(`/checkout?vendorId=${id}`)}
             className="bg-gray-900 text-white px-10 py-4 rounded-2xl font-bold hover:bg-red-600 transition-all shadow-xl shadow-gray-900/10 active:scale-95"
           >
             Book Now
@@ -415,7 +434,10 @@ const GarageDetails = () => {
 
             <button 
               disabled={!selectedService}
-              onClick={() => navigate('/checkout')}
+              onClick={() => {
+                const svc = garage.services.find((s: any) => s.id === selectedService);
+                navigate(`/checkout?vendorId=${id}&service=${encodeURIComponent(svc?.name || '')}&price=${svc?.price || 0}`);
+              }}
               className={cn(
                 "w-full py-5 rounded-2xl font-bold text-lg transition-all mb-6 shadow-xl active:scale-95",
                 selectedService 

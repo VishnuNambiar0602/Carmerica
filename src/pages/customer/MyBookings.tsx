@@ -26,13 +26,19 @@ import { Link } from 'react-router-dom';
 const MyBookings = () => {
   const [activeTab, setActiveTab] = React.useState<'upcoming' | 'past'>('upcoming');
   const [bookings, setBookings] = React.useState<any[]>([]);
-  const userEmail = typeof window !== 'undefined' ? localStorage.getItem('userEmail') : null;
 
   React.useEffect(() => {
     const load = async () => {
       try {
-        if (!userEmail) return;
-        const res = await fetch(`/api/bookings?customerEmail=${encodeURIComponent(userEmail)}`);
+        const token = localStorage.getItem('token');
+        if (!token) return;
+        const authRes = await fetch('/api/auth/me', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!authRes.ok) return;
+        const user = await authRes.json();
+        if (!user.email) return;
+        const res = await fetch(`/api/bookings?customerEmail=${encodeURIComponent(user.email)}`);
         const data = await res.json();
         setBookings(data || []);
       } catch (err) {
@@ -40,7 +46,7 @@ const MyBookings = () => {
       }
     };
     load();
-  }, [userEmail]);
+  }, []);
 
   const filteredBookings = bookings.filter(b => (activeTab === 'upcoming' ? ['Confirmed','Pending','In Progress'].includes(b.status) : b.status === 'Completed'));
 

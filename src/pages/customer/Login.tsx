@@ -1,11 +1,13 @@
 import React from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Car, Mail, Lock, Eye, EyeOff, Chrome, Facebook, ArrowRight } from 'lucide-react';
+import { Car, Mail, Lock, Eye, EyeOff, Chrome, Facebook, Loader2 } from 'lucide-react';
 
 const Login = () => {
   const navigate = useNavigate();
   const [isLogin, setIsLogin] = React.useState(true);
   const [showPassword, setShowPassword] = React.useState(false);
+  const [loading, setLoading] = React.useState(false);
+  const [error, setError] = React.useState('');
   const [formData, setFormData] = React.useState({
     email: '',
     password: '',
@@ -14,24 +16,35 @@ const Login = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setLoading(true);
+    setError('');
     try {
-      const res = await fetch(isLogin ? '/api/auth/login' : '/api/auth/register', {
+      const endpoint = isLogin ? '/api/auth/login' : '/api/auth/register';
+      const body: Record<string, string> = {
+        email: formData.email,
+        password: formData.password,
+        role: 'customer'
+      };
+      if (!isLogin) body.fullName = formData.fullName;
+      const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: formData.email, password: formData.password, fullName: formData.fullName, role: 'customer' })
+        body: JSON.stringify(body)
       });
       const data = await res.json();
       if (res.ok) {
-        localStorage.setItem('authToken', data.token);
-        localStorage.setItem('userRole', 'customer');
-        localStorage.setItem('userEmail', formData.email);
-        navigate('/');
+        localStorage.setItem('token', data.token);
+        localStorage.setItem('user', JSON.stringify(data.user));
+        const params = new URLSearchParams(window.location.search);
+        const redirect = params.get('redirect') || '/';
+        navigate(redirect);
       } else {
-        alert(data.message || 'Login failed');
+        setError(data.message || (isLogin ? 'Login failed' : 'Registration failed'));
       }
-    } catch (err) {
-      console.error(err);
-      alert('Network error');
+    } catch {
+      setError('Network error');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -50,13 +63,19 @@ const Login = () => {
           <p className="mt-2 text-sm text-gray-600">
             {isLogin ? "Don't have an account? " : "Already have an account? "}
             <button
-              onClick={() => setIsLogin(!isLogin)}
+              onClick={() => { setIsLogin(!isLogin); setError(''); }}
               className="font-bold text-[#0071c2] hover:underline focus:outline-none"
             >
               {isLogin ? 'Register here' : 'Sign in here'}
             </button>
           </p>
         </div>
+
+        {error && (
+          <div className="bg-red-50 border border-red-200 text-red-700 text-sm p-4 rounded-lg">
+            {error}
+          </div>
+        )}
 
         <div className="mt-8 space-y-6">
           <div className="grid grid-cols-2 gap-3">
@@ -157,7 +176,6 @@ const Login = () => {
                     Remember me
                   </label>
                 </div>
-
                 <div className="text-sm">
                   <Link to="/forgot-password" className="font-bold text-[#0071c2] hover:underline">
                     Forgot password?
@@ -169,9 +187,10 @@ const Login = () => {
             <div>
               <button
                 type="submit"
-                className="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-bold text-white bg-[#0071c2] hover:bg-[#005999] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#0071c2] transition-colors"
+                disabled={loading}
+                className="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-bold text-white bg-[#0071c2] hover:bg-[#005999] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#0071c2] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {isLogin ? 'Sign in' : 'Create account'}
+                {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : (isLogin ? 'Sign in' : 'Create account')}
               </button>
             </div>
           </form>

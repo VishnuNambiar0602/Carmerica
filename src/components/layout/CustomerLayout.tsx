@@ -1,11 +1,18 @@
 import React from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
-import { Car, Search, User, Menu, Phone, HelpCircle, Globe, Briefcase, MapPin } from 'lucide-react';
+import { Car, Search, User, Menu, Phone, HelpCircle, Globe, Briefcase, MapPin, LogOut } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
 const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = React.useState(false);
   const location = useLocation();
+  
+  // Check if user is authenticated
+  const isAuthenticated = () => {
+    if (typeof window === 'undefined') return false;
+    const token = localStorage.getItem('token');
+    return !!token;
+  };
 
   const navLinks: Array<{ name: string; path: string; icon?: React.ComponentType<{ className?: string }> }> = [
     { name: 'Home', path: '/' },
@@ -54,9 +61,29 @@ const Navbar = () => {
             <button className="p-2 hover:bg-[#00224f] rounded-full">
               <Globe className="h-5 w-5" />
             </button>
-            <Link to="/login" className="bg-white text-[#003580] px-4 py-2 rounded-sm text-sm font-bold hover:bg-gray-100 transition-colors">
-              Sign in / Register
-            </Link>
+            {isAuthenticated() ? (
+              <>
+                <Link to="/profile" className="flex items-center space-x-2 text-sm font-medium hover:underline">
+                  <User className="h-4 w-4" />
+                  Profile
+                </Link>
+                <button 
+                  onClick={() => {
+                    localStorage.removeItem('token');
+                    localStorage.removeItem('user');
+                    localStorage.removeItem('vendor');
+                    window.location.reload();
+                  }}
+                  className="text-sm font-medium hover:underline ml-4"
+                >
+                  Log out
+                </button>
+              </>
+            ) : (
+              <Link to="/login" className="bg-white text-[#003580] px-4 py-2 rounded-sm text-sm font-bold hover:bg-gray-100 transition-colors">
+                Sign in / Register
+              </Link>
+            )}
           </div>
           <div className="md:hidden">
             <button
@@ -86,13 +113,37 @@ const Navbar = () => {
               </Link>
             );
           })}
-          <Link
-            to="/login"
-            className="block px-3 py-2 rounded-md text-base font-medium bg-white text-[#003580] mt-4"
-            onClick={() => setIsMenuOpen(false)}
-          >
-            Sign in
-          </Link>
+          {isAuthenticated() ? (
+            <>
+              <Link
+                to="/profile"
+                className="block px-3 py-2 rounded-md text-base font-medium bg-white text-[#003580] mt-4"
+                onClick={() => setIsMenuOpen(false)}
+              >
+                Profile
+              </Link>
+              <button 
+                onClick={() => {
+                  localStorage.removeItem('token');
+                  localStorage.removeItem('user');
+                  localStorage.removeItem('vendor');
+                  setIsMenuOpen(false);
+                  window.location.reload();
+                }}
+                className="block px-3 py-2 rounded-md text-base font-medium bg-white text-[#003580] mt-4"
+              >
+                Log out
+              </button>
+            </>
+          ) : (
+            <Link
+              to="/login"
+              className="block px-3 py-2 rounded-md text-base font-medium bg-white text-[#003580] mt-4"
+              onClick={() => setIsMenuOpen(false)}
+            >
+              Sign in
+            </Link>
+          )}
         </div>
       )}
     </nav>

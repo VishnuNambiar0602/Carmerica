@@ -95,6 +95,8 @@ create table if not exists payments (
   provider text,
   provider_payment_id text,
   refund_amount numeric(12,2) not null default 0,
+  stripe_payment_intent_id text,
+  stripe_charge_id text,
   metadata jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -258,12 +260,38 @@ create table if not exists audit_logs (
   created_at timestamptz not null default now()
 );
 
+create table if not exists vehicles (
+  id text primary key,
+  user_id text references users(id) on delete cascade,
+  make text not null,
+  model text not null,
+  year integer not null,
+  vin text,
+  mileage integer not null default 0,
+  color text,
+  fuel_type text,
+  last_service_date date,
+  last_service_type text,
+  status text not null default 'active',
+  metadata jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
 alter table payments add column if not exists provider text;
 alter table payments add column if not exists provider_payment_id text;
+alter table payments add column if not exists stripe_payment_intent_id text;
+alter table payments add column if not exists stripe_charge_id text;
 alter table kyv_documents add column if not exists file_hash text;
 alter table kyv_documents add column if not exists file_size integer not null default 0;
 alter table kyv_documents add column if not exists mime_type text;
 alter table kyv_documents add column if not exists review_note text;
+
+alter table garages add column if not exists lat numeric(10, 7);
+alter table garages add column if not exists lng numeric(10, 7);
+alter table garages add column if not exists opening_hours text;
+alter table garages add column if not exists phone text;
+alter table garages add column if not exists images text[] default '{}';
 
 create index if not exists idx_users_email_role on users (lower(email), role);
 create index if not exists idx_bookings_vendor_date on bookings (vendor_id, scheduled_date);
@@ -271,3 +299,4 @@ create index if not exists idx_bookings_customer_email on bookings (lower(custom
 create index if not exists idx_payments_provider_payment_id on payments (provider_payment_id);
 create index if not exists idx_kyv_documents_vendor_status on kyv_documents (vendor_id, status);
 create index if not exists idx_audit_logs_entity on audit_logs (entity_type, entity_id, created_at desc);
+
