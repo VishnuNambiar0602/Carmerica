@@ -31,12 +31,13 @@ export function requestLogger(req: Request, res: Response, next: NextFunction) {
 
 export function authenticate(req: Request, res: Response, next: NextFunction) {
   const header = req.headers.authorization || '';
-  if (!header.startsWith('Bearer ')) {
+  const token = req.cookies?.auth_token || (header.startsWith('Bearer ') ? header.slice(7) : '');
+  if (!token || token === 'null' || token === 'undefined') {
     return res.status(401).json({ message: 'Unauthorized' });
   }
 
   try {
-    const payload = jwt.verify(header.slice(7), getJwtSecret()) as AuthUser;
+    const payload = jwt.verify(token, getJwtSecret()) as AuthUser;
     req.user = payload;
     next();
   } catch {

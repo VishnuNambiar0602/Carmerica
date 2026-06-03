@@ -293,10 +293,16 @@ alter table garages add column if not exists opening_hours text;
 alter table garages add column if not exists phone text;
 alter table garages add column if not exists images text[] default '{}';
 
+alter table promotions add column if not exists promo_code text unique;
+alter table promotions add column if not exists usage_limit integer;
+alter table promotions add column if not exists used_count integer not null default 0;
+alter table users add column if not exists email_verified_at timestamptz;
+
 create index if not exists idx_users_email_role on users (lower(email), role);
 create index if not exists idx_bookings_vendor_date on bookings (vendor_id, scheduled_date);
 create index if not exists idx_bookings_customer_email on bookings (lower(customer_email));
 create index if not exists idx_payments_provider_payment_id on payments (provider_payment_id);
 create index if not exists idx_kyv_documents_vendor_status on kyv_documents (vendor_id, status);
 create index if not exists idx_audit_logs_entity on audit_logs (entity_type, entity_id, created_at desc);
+
 

@@ -241,6 +241,10 @@ const Home = () => {
                     alt={item.title} 
                     className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
                     referrerPolicy="no-referrer"
+                    loading="lazy"
+                    width="400"
+                    height="250"
+                    decoding="async"
                   />
                   <div className="absolute top-4 left-4">
                     <span className="bg-white/90 backdrop-blur-md text-gray-900 text-[10px] font-bold px-3 py-1.5 rounded-full shadow-sm flex items-center">
@@ -367,6 +371,10 @@ const Home = () => {
                 alt="Offer" 
                 className="absolute inset-0 w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000"
                 referrerPolicy="no-referrer"
+                loading="lazy"
+                width="800"
+                height="400"
+                decoding="async"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent flex flex-col justify-end p-10">
                 <div className="flex items-center space-x-2 mb-4">
@@ -389,6 +397,10 @@ const Home = () => {
                 alt="Offer" 
                 className="absolute inset-0 w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000"
                 referrerPolicy="no-referrer"
+                loading="lazy"
+                width="800"
+                height="400"
+                decoding="async"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent flex flex-col justify-end p-10">
                 <div className="flex items-center space-x-2 mb-4">

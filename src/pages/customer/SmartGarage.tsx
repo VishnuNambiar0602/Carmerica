@@ -35,6 +35,7 @@ const SmartGarage = () => {
     vulnerability?: string;
     keywords?: string[];
   }>(null);
+  const [uploadedImage, setUploadedImage] = useState<string | null>(null);
 
   // Modal State
   const [showModal, setShowModal] = useState(false);
@@ -185,6 +186,7 @@ const SmartGarage = () => {
       const reader = new FileReader();
       reader.onloadend = async () => {
         const base64String = (reader.result as string).split(',')[1];
+        setUploadedImage(reader.result as string);
         
         try {
           const response = await fetch('/api/ai/identify-part', {
@@ -367,7 +369,7 @@ const SmartGarage = () => {
                 <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
                   <div className="flex flex-col md:flex-row gap-8">
                     <div className="w-full md:w-1/2 relative rounded-2xl overflow-hidden shadow-lg border border-gray-100">
-                      <img src="https://picsum.photos/seed/brakepad/800/600" alt="Detected Part" className="w-full h-full object-cover" />
+                      <img src={uploadedImage || "https://picsum.photos/seed/brakepad/800/600"} alt="Detected Part" className="w-full h-full object-cover" loading="lazy" width="800" height="600" decoding="async" />
                       <div className="absolute inset-0 bg-red-600/10" />
                       <div className="absolute top-1/4 left-1/4 w-1/2 h-1/2 border-2 border-red-500 rounded-lg shadow-[0_0_0_9999px_rgba(0,0,0,0.4)]">
                         <span className="absolute -top-8 left-0 bg-red-600 text-white px-2 py-1 rounded text-[10px] font-bold uppercase tracking-widest">
@@ -381,7 +383,7 @@ const SmartGarage = () => {
                           <CheckCircle2 className="h-5 w-5 text-green-600 mr-2" />
                           <span className="text-sm font-bold text-green-900">AI Confidence: {(identifiedPart.confidence * 100).toFixed(0)}%</span>
                         </div>
-                        <button onClick={() => setIdentifiedPart(null)} className="text-xs font-bold text-gray-400 hover:text-gray-600">Reset</button>
+                        <button onClick={() => { setIdentifiedPart(null); setUploadedImage(null); }} className="text-xs font-bold text-gray-400 hover:text-gray-600">Reset</button>
                       </div>
                       
                       <div>

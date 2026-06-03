@@ -2,6 +2,7 @@ import React from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
 import { Car, Search, User, Menu, Phone, HelpCircle, Globe, Briefcase, MapPin, LogOut } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { NotificationBell } from '../NotificationBell';
 
 const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = React.useState(false);
@@ -13,6 +14,17 @@ const Navbar = () => {
     const token = localStorage.getItem('token');
     return !!token;
   };
+
+  const getUser = () => {
+    if (typeof window === 'undefined') return null;
+    const userStr = localStorage.getItem('user');
+    try {
+      return userStr ? JSON.parse(userStr) : null;
+    } catch {
+      return null;
+    }
+  };
+  const user = getUser();
 
   const navLinks: Array<{ name: string; path: string; icon?: React.ComponentType<{ className?: string }> }> = [
     { name: 'Home', path: '/' },
@@ -63,6 +75,7 @@ const Navbar = () => {
             </button>
             {isAuthenticated() ? (
               <>
+                <NotificationBell userId={user?.id || 'user-1'} role="customer" />
                 <Link to="/profile" className="flex items-center space-x-2 text-sm font-medium hover:underline">
                   <User className="h-4 w-4" />
                   Profile
@@ -115,9 +128,13 @@ const Navbar = () => {
           })}
           {isAuthenticated() ? (
             <>
+              <div className="px-3 py-2 flex items-center justify-between bg-white/5 rounded-md mt-4 mx-3">
+                <span className="text-sm font-medium">Notifications</span>
+                <NotificationBell userId={user?.id || 'user-1'} role="customer" />
+              </div>
               <Link
                 to="/profile"
-                className="block px-3 py-2 rounded-md text-base font-medium bg-white text-[#003580] mt-4"
+                className="block px-3 py-2 rounded-md text-base font-medium bg-white text-[#003580] mt-2"
                 onClick={() => setIsMenuOpen(false)}
               >
                 Profile

@@ -2,9 +2,9 @@ import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { db } from './lib/db.js';
-import { cacheDel as baseCacheDel } from './lib/redis.js';
+import { cacheDel as baseCacheDel, cacheGet, cacheSet } from './lib/redis.js';
 import { getAIStatus, sendAIMessage } from './lib/aiSupport.js';
-import { sendPasswordResetEmail } from './lib/mailer.js';
+import { sendPasswordResetEmail, sendMail, sendVerificationEmail } from './lib/mailer.js';
 import { generate } from './lib/groq.js';
 import { getJwtSecret } from './lib/config.js';
 import {
@@ -14,6 +14,7 @@ import {
   confirmPaymentIntent,
   getPaymentConfig,
 } from './lib/stripe.js';
+import multer from 'multer';
 
 type Role = 'customer' | 'vendor' | 'admin';
 
@@ -35,9 +36,10 @@ const issueToken = (user: any) => jwt.sign(
 
 const userFromToken = (req: any) => {
   const header = req.headers.authorization || '';
-  if (!header.startsWith('Bearer ')) return null;
+  const token = req.cookies?.auth_token || (header.startsWith('Bearer ') ? header.slice(7) : '');
+  if (!token || token === 'null' || token === 'undefined') return null;
   try {
-    const payload = jwt.verify(header.slice(7), JWT_SECRET) as { sub: string };
+    const payload = jwt.verify(token, JWT_SECRET) as { sub: string };
     return db.findUserById(payload.sub);
   } catch {
     return null;
@@ -48,6 +50,9 @@ const requireRole = (...roles: Role[]) => async (req: any, res: any, next: any) 
   const user = await userFromToken(req);
   if (!user) return res.status(401).json({ message: 'Unauthorized' });
   if (!roles.includes(user.role)) return res.status(403).json({ message: 'Forbidden' });
+  if (user.role === 'vendor' && !user.email_verified_at) {
+    return res.status(403).json({ message: 'Please verify your email before using vendor features.' });
+  }
   req.user = user;
   next();
 };
@@ -67,6 +72,22 @@ const resolveVendorId = async (req: any) => {
 const cacheDel = async (key: string) => {
   try { await baseCacheDel(key); } catch { /* ignore */ }
 };
+
+async function withCache<T>(key: string, ttl: number, fn: () => Promise<T>): Promise<T> {
+  try {
+    const cached = await cacheGet<T>(key);
+    if (cached !== null && cached !== undefined) return cached;
+  } catch (err) {
+    console.warn('[Cache] Error reading from Redis:', err);
+  }
+  const result = await fn();
+  try {
+    await cacheSet(key, result, ttl);
+  } catch (err) {
+    console.warn('[Cache] Error writing to Redis:', err);
+  }
+  return result;
+}
 
 const clearBookingCache = async (booking: any) => {
   await Promise.allSettled([
@@ -105,6 +126,21 @@ const decorateService = async (service: any) => {
     active: service.active,
     aiTag: priceTags[Math.abs(service.id.charCodeAt(0)) % priceTags.length],
     marketPrice: Math.round(Number(service.price) * 1.15),
+  };
+};
+
+const decorateBooking = async (booking: any) => {
+  const garage = booking.garage_id ? await db.findGarageById(booking.garage_id) : null;
+  const service = booking.service_id ? await db.findServiceById(booking.service_id) : null;
+  return {
+    ...booking,
+    garage: garage?.name || 'Local Garage',
+    location: garage?.location || 'Nearby',
+    service: service?.name || 'General Service',
+    date: booking.scheduled_date,
+    time: booking.scheduled_time,
+    car: booking.vehicle || 'Vehicle',
+    price: Number(booking.amount || 0),
   };
 };
 
@@ -190,7 +226,7 @@ router.post('/ai/smart-search', async (req, res) => {
     }
 
     const searchTerm = analysis.keywords[0] || query;
-    const garages = await db.listGarages({ query: searchTerm });
+    const { data: garages } = await db.listGarages({ query: searchTerm });
     const services = await db.listServices();
     const serviceMap = services.reduce((acc: Record<string, any[]>, s) => {
       if (!acc[s.garage_id]) acc[s.garage_id] = [];
@@ -390,12 +426,66 @@ router.post('/auth/register', async (req, res) => {
         created_at: now(), updated_at: now(),
       };
       await db.createVendor(vendor);
+
+      const verifyToken = db.generateId('verify');
+      db.addVerificationToken(verifyToken, email);
+      try {
+        await sendVerificationEmail(email, verifyToken);
+      } catch (err) {
+        console.error('[Mail] Failed to send verification email:', err);
+      }
     }
 
-    res.status(201).json({ message: 'Registered', token: issueToken(user), user: safeUser(user), vendor });
+    const token = issueToken(user);
+    res.cookie('auth_token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    });
+    res.status(201).json({ message: 'Registered', user: safeUser(user), vendor });
   } catch (error) {
     console.error('[Auth] Registration error:', error);
     res.status(500).json({ message: 'Registration failed' });
+  }
+});
+
+router.get('/auth/verify-email', async (req, res) => {
+  try {
+    const token = String(req.query.token || '');
+    const entry = db.findVerificationToken(token);
+    if (!entry) return res.status(400).json({ message: 'Invalid or expired verification link' });
+    const user = await db.findUserByEmail(entry.email, 'vendor');
+    if (user) {
+      await db.updateUser(user.id, { email_verified_at: now() });
+    }
+    db.removeVerificationToken(token);
+    res.redirect('/vendor/login?verified=1');
+  } catch (error) {
+    console.error('[Auth] Verify email error:', error);
+    res.status(500).json({ message: 'Verification failed' });
+  }
+});
+
+router.post('/auth/resend-verification', async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ message: 'Email required' });
+    const user = await db.findUserByEmail(email, 'vendor');
+    if (!user) return res.json({ message: 'If email is registered, verification link was sent.' });
+    if (user.email_verified_at) return res.status(400).json({ message: 'Email already verified' });
+
+    const verifyToken = db.generateId('verify');
+    db.addVerificationToken(verifyToken, user.email);
+    try {
+      await sendVerificationEmail(user.email, verifyToken);
+    } catch (err) {
+      console.error('[Mail] Failed to resend verification email:', err);
+    }
+    res.json({ message: 'If email is registered, verification link was sent.' });
+  } catch (error) {
+    console.error('[Auth] Resend verification error:', error);
+    res.status(500).json({ message: 'Resend failed' });
   }
 });
 
@@ -422,7 +512,14 @@ router.post('/auth/login', async (req, res) => {
     const vendor = user.role === 'vendor' ? await db.findVendorByUserId(user.id) : null;
     console.log(`[Auth] Login successful: ${email} (${user.role})`);
     
-    res.json({ message: 'Authenticated', token: issueToken(user), user: safeUser(user), vendor });
+    const token = issueToken(user);
+    res.cookie('auth_token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    });
+    res.json({ message: 'Authenticated', user: safeUser(user), vendor });
   } catch (error) {
     console.error('[Auth] Login error:', error);
     res.status(500).json({ message: 'Login failed' });
@@ -437,13 +534,23 @@ router.post('/admin/login', async (req, res) => {
     if (!user) return res.status(401).json({ message: 'Invalid credentials' });
     const valid = await bcrypt.compare(password, user.password_hash);
     if (!valid) return res.status(401).json({ message: 'Invalid credentials' });
-    res.json({ message: 'Authenticated', token: issueToken(user), user: safeUser(user) });
+    const token = issueToken(user);
+    res.cookie('auth_token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    });
+    res.json({ message: 'Authenticated', user: safeUser(user) });
   } catch (error) {
     res.status(500).json({ message: 'Login failed' });
   }
 });
 
-router.post('/auth/logout', (_req, res) => res.json({ message: 'Logged out' }));
+router.post('/auth/logout', (_req, res) => {
+  res.clearCookie('auth_token');
+  res.json({ message: 'Logged out' });
+});
 
 router.post('/auth/forgot-password', async (req, res) => {
   const { email, role = 'customer' } = req.body;
@@ -497,9 +604,15 @@ router.get('/services', async (req, res) => {
   const query = String(req.query.query || req.query.serviceType || '').trim();
   const vendorId = String(req.query.vendorId || '');
   const garageId = String(req.query.garageId || '');
-  let services = await db.listServices({ vendorId: vendorId || undefined, garageId: garageId || undefined });
-  if (query) services = services.filter((s) => matches(s, query));
-  const decorated = await Promise.all(services.map(decorateService));
+  
+  const cacheKey = `services:${query}:${vendorId}:${garageId}`;
+  
+  const decorated = await withCache(cacheKey, 300, async () => {
+    let services = await db.listServices({ vendorId: vendorId || undefined, garageId: garageId || undefined });
+    if (query) services = services.filter((s) => matches(s, query));
+    return Promise.all(services.map(decorateService));
+  });
+  
   res.json(decorated);
 });
 
@@ -508,7 +621,7 @@ router.post('/services', requireRole('vendor', 'admin'), async (req: any, res) =
     const vendorId = await resolveVendorId(req);
     const name = String(req.body.name || '').trim();
     if (!name) return res.status(400).json({ message: 'Service name is required' });
-    const garage = await db.listGarages({ vendorId });
+    const { data: garage } = await db.listGarages({ vendorId });
     const catSlug = slugify(req.body.category || '');
     const cat = catSlug ? await db.findCategoryBySlug(catSlug) : null;
     const service = {
@@ -549,15 +662,63 @@ router.delete('/services/:id', requireRole('vendor', 'admin'), async (req, res) 
   res.json(removed ? await decorateService(removed) : {});
 });
 
-// --- Garages ---
 router.get('/garages', async (req, res) => {
   const query = String(req.query.query || req.query.location || req.query.q || '').trim();
   const vendorId = String(req.query.vendorId || '').trim();
-  const garages = await db.listGarages({
-    query: query || undefined,
-    vendorId: vendorId || undefined
+  const minRating = req.query.minRating ? Number(req.query.minRating) : undefined;
+  const city = String(req.query.city || '').trim() || undefined;
+  const hasPaging = req.query.limit !== undefined || req.query.offset !== undefined;
+  const limit = req.query.limit ? Number(req.query.limit) : 20;
+  const offset = req.query.offset ? Number(req.query.offset) : 0;
+
+  const cacheKey = `garages:${query}:${vendorId}:${minRating}:${city}:${hasPaging}:${limit}:${offset}`;
+
+  const result = await withCache(cacheKey, 300, async () => {
+    const { data: garages, total } = await db.listGarages({
+      query: query || undefined,
+      vendorId: vendorId || undefined,
+      minRating,
+      city,
+      limit: hasPaging ? limit : undefined,
+      offset: hasPaging ? offset : undefined,
+    });
+
+    const services = await db.listServices();
+    const serviceMap = services.reduce((acc: Record<string, any[]>, s) => {
+      if (!acc[s.garage_id]) acc[s.garage_id] = [];
+      acc[s.garage_id].push(s);
+      return acc;
+    }, {});
+
+    const enriched = garages.map((g: any, i: number) => {
+      const garageServices = serviceMap[g.id] || [];
+      const price = Number(garageServices[0]?.price || 100);
+      return {
+        id: g.id,
+        name: g.name,
+        location: g.location,
+        city: g.city || '',
+        distance: g.metadata?.distance || `${((i + 1) * 1.5).toFixed(1)} miles away`,
+        rating: Number(g.rating || 4.5),
+        reviews: Number(g.reviews || 100),
+        price: price,
+        marketPrice: price + 15,
+        services: garageServices.map((s) => s.name),
+        availability: g.metadata?.availability || 'Available Today',
+        image: g.image || `https://picsum.photos/seed/garage${g.id}/400/250`,
+        trustScore: Number(g.trustScore || (90 + (i % 10))),
+        isFairValue: true,
+        lat: g.lat ? Number(g.lat) : undefined,
+        lng: g.lng ? Number(g.lng) : undefined,
+        aiAlert: g.metadata?.aiAlert,
+        badge: g.rating >= 4.8 ? 'Top Rated' : undefined,
+      };
+    });
+
+    return hasPaging ? { garages: enriched, total, limit, offset } : enriched;
   });
-  res.json(garages);
+
+  res.json(result);
 });
 
 router.get('/garages/:id', async (req, res) => {
@@ -641,7 +802,7 @@ router.get('/bookings', async (req, res) => {
     vendorId: vendorId || undefined,
     customerEmail: customerEmail || undefined,
   });
-  res.json(bookings);
+  res.json(await Promise.all(bookings.map(decorateBooking)));
 });
 
 router.post('/bookings', async (req, res) => {
@@ -662,6 +823,17 @@ router.post('/bookings', async (req, res) => {
       if (user) customerId = user.id;
     }
 
+    const { promoId } = req.body;
+    if (promoId) {
+      const promos = await db.listPromotions();
+      const matchingPromo = promos.find((p) => p.id === promoId);
+      if (matchingPromo) {
+        await db.updatePromotion(promoId, {
+          used_count: (matchingPromo.used_count || 0) + 1
+        });
+      }
+    }
+
     const booking = {
       id: db.generateId('BK'), vendor_id: vendorId, garage_id: garageId, service_id: req.body.serviceId || '',
       customer_id: customerId,
@@ -670,6 +842,7 @@ router.post('/bookings', async (req, res) => {
       vehicle: carYear && carModel ? `${carModel} (${carYear})` : req.body.car || 'Vehicle',
       license: license || '', scheduled_date: date, scheduled_time: time, status: 'Pending',
       amount: Number(price || 0), created_at: now(), updated_at: now(),
+      metadata: promoId ? { promoId } : {},
     };
     const created = await db.createBooking(booking);
     await clearBookingCache(created);
@@ -677,6 +850,16 @@ router.post('/bookings', async (req, res) => {
       id: db.generateId('notif'), user_id: email, type: 'booking_created', title: 'Booking created',
       body: `Booking ${created.id} is now pending.`, is_read: false, created_at: now(), metadata: { bookingId: created.id } as any,
     });
+    try {
+      await sendMail({
+        to: email,
+        subject: `Your Booking is Pending: ${created.id}`,
+        text: `Hi ${booking.customer_name},\n\nYour booking for ${booking.vehicle} on ${booking.scheduled_date} at ${booking.scheduled_time} is pending confirmation. Amount: AED ${booking.amount}.\n\nThanks,\nCarServ Team`,
+        html: `<p>Hi ${booking.customer_name},</p><p>Your booking for <strong>${booking.vehicle}</strong> on <strong>${booking.scheduled_date}</strong> at <strong>${booking.scheduled_time}</strong> is pending confirmation.</p><p>Amount: AED ${booking.amount}.</p><p>Thanks,<br/>CarServ Team</p>`
+      });
+    } catch (err) {
+      console.error('[Mail] Failed to send booking pending email:', err);
+    }
     res.status(201).json(created);
   } catch (error) {
     res.status(500).json({ message: 'Failed to create booking' });
@@ -686,14 +869,34 @@ router.post('/bookings', async (req, res) => {
 router.get('/bookings/:id', async (req, res) => {
   const booking = await db.findBookingById(req.params.id);
   if (!booking) return res.status(404).json({ message: 'Booking not found' });
-  res.json(booking);
+  res.json(await decorateBooking(booking));
 });
 
 router.patch('/bookings/:id', async (req, res) => {
   const booking = await db.findBookingById(req.params.id);
   if (!booking) return res.status(404).json({ message: 'Booking not found' });
+  const oldStatus = booking.status;
   const updated = await db.updateBooking(req.params.id, { ...req.body });
-  if (updated) await clearBookingCache(updated);
+  if (updated) {
+    await clearBookingCache(updated);
+    if (req.body.status && req.body.status !== oldStatus) {
+      const statusStr = req.body.status.toLowerCase();
+      await db.createNotification({
+        id: db.generateId('notif'), user_id: booking.customer_email, type: `booking_${statusStr}`, title: `Booking ${req.body.status}`,
+        body: `Booking ${booking.id} has been ${statusStr}.`, is_read: false, created_at: now(), metadata: { bookingId: booking.id } as any,
+      });
+      try {
+        await sendMail({
+          to: booking.customer_email,
+          subject: `Your Booking is ${req.body.status}: ${booking.id}`,
+          text: `Hi ${booking.customer_name || 'Customer'},\n\nYour booking for ${booking.vehicle} has been ${statusStr}.\n\nScheduled Date: ${updated.scheduled_date}\nScheduled Time: ${updated.scheduled_time}\n\nThanks,\nCarServ Team`,
+          html: `<p>Hi ${booking.customer_name || 'Customer'},</p><p>Your booking for <strong>${booking.vehicle}</strong> has been <strong>${statusStr}</strong>.</p><p>Scheduled Date: <strong>${updated.scheduled_date}</strong><br/>Scheduled Time: <strong>${updated.scheduled_time}</strong></p><p>Thanks,<br/>CarServ Team</p>`
+        });
+      } catch (err) {
+        console.error(`[Mail] Failed to send booking status change email:`, err);
+      }
+    }
+  }
   res.json(updated);
 });
 
@@ -702,6 +905,22 @@ router.post('/bookings/:id/cancel', async (req, res) => {
   if (!booking) return res.status(404).json({ message: 'Booking not found' });
   await db.updateBooking(req.params.id, { status: 'Cancelled', cancellation_reason: req.body.reason || '' });
   await clearBookingCache(booking);
+
+  await db.createNotification({
+    id: db.generateId('notif'), user_id: booking.customer_email, type: 'booking_cancelled', title: 'Booking cancelled',
+    body: `Booking ${booking.id} has been cancelled. Reason: ${req.body.reason || 'None provided'}.`, is_read: false, created_at: now(), metadata: { bookingId: booking.id } as any,
+  });
+  try {
+    await sendMail({
+      to: booking.customer_email,
+      subject: `Your Booking is Cancelled: ${booking.id}`,
+      text: `Hi ${booking.customer_name || 'Customer'},\n\nYour booking for ${booking.vehicle} has been cancelled.\nReason: ${req.body.reason || 'None provided'}\n\nThanks,\nCarServ Team`,
+      html: `<p>Hi ${booking.customer_name || 'Customer'},</p><p>Your booking for <strong>${booking.vehicle}</strong> has been <strong>cancelled</strong>.</p><p>Reason: ${req.body.reason || 'None provided'}</p><p>Thanks,<br/>CarServ Team</p>`
+    });
+  } catch (err) {
+    console.error('[Mail] Failed to send booking cancelled email:', err);
+  }
+
   const payment = await db.findPaymentByBookingId(booking.id);
   let refund = null;
   if (payment && payment.status !== 'refunded') {
@@ -730,6 +949,22 @@ router.post('/bookings/:id/reschedule', async (req, res) => {
   });
   await clearBookingCache(booking);
   const updated = await db.findBookingById(req.params.id);
+  if (updated) {
+    await db.createNotification({
+      id: db.generateId('notif'), user_id: booking.customer_email, type: 'booking_confirmed', title: 'Booking rescheduled',
+      body: `Booking ${booking.id} rescheduled to ${updated.scheduled_date} at ${updated.scheduled_time}.`, is_read: false, created_at: now(), metadata: { bookingId: booking.id } as any,
+    });
+    try {
+      await sendMail({
+        to: booking.customer_email,
+        subject: `Your Booking is Rescheduled: ${booking.id}`,
+        text: `Hi ${booking.customer_name || 'Customer'},\n\nYour booking for ${booking.vehicle} has been rescheduled to ${updated.scheduled_date} at ${updated.scheduled_time}.\n\nThanks,\nCarServ Team`,
+        html: `<p>Hi ${booking.customer_name || 'Customer'},</p><p>Your booking for <strong>${booking.vehicle}</strong> has been <strong>rescheduled</strong> to <strong>${updated.scheduled_date}</strong> at <strong>${updated.scheduled_time}</strong>.</p><p>Thanks,<br/>CarServ Team</p>`
+      });
+    } catch (err) {
+      console.error('[Mail] Failed to send booking rescheduled email:', err);
+    }
+  }
   res.json({ message: 'Booking rescheduled', booking: updated });
 });
 
@@ -825,17 +1060,71 @@ router.post('/messages', (req, res) => {
   res.status(201).json(msg);
 });
 
+router.get('/messages/stream', (req, res) => {
+  const threadId = req.query.threadId;
+  if (!threadId) return res.status(400).end();
+
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders();
+
+  const send = (data: any) => {
+    res.write(`data: ${JSON.stringify(data)}\n\n`);
+  };
+
+  // Poll for messages in this thread
+  const interval = setInterval(async () => {
+    try {
+      const msgs = db.getMessages()[String(threadId)] || [];
+      send({ messages: msgs });
+    } catch (err) {
+      console.error('[SSE] Error polling messages:', err);
+    }
+  }, 2000);
+
+  req.on('close', () => {
+    clearInterval(interval);
+  });
+});
+
 // --- Vendor Stats ---
 router.get('/vendor/stats', async (req, res) => {
   const vendorId = String(req.query.vendorId || 'vendor-1');
-  const vendorBookings = await db.listBookings({ vendorId });
+  const period = String(req.query.period || 'month'); // 'week' | 'month' | 'year' | 'all'
+
+  const allBookings = await db.listBookings({ vendorId });
+  const now = new Date();
+
+  const periodStart = {
+    week: new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000),
+    month: new Date(now.getFullYear(), now.getMonth(), 1),
+    year: new Date(now.getFullYear(), 0, 1),
+    all: new Date(0),
+  }[period] || new Date(now.getFullYear(), now.getMonth(), 1);
+
+  const periodBookings = allBookings.filter(b => {
+    const dateStr = b.created_at || b.scheduled_date;
+    const date = new Date(dateStr);
+    return date >= periodStart;
+  });
+
+  // Only count revenue from completed/confirmed bookings
+  const revenueBookings = periodBookings.filter(b =>
+    ['Confirmed', 'Completed'].includes(b.status)
+  );
+
   const vendor = await db.findVendorById(vendorId);
   res.json({
-    totalBookings: vendorBookings.length,
-    monthlyRevenue: vendorBookings.reduce((sum, b) => sum + (Number(b.amount) || 0), 0),
+    totalBookings: allBookings.length,
+    periodBookings: periodBookings.length,
+    monthlyRevenue: revenueBookings.reduce((sum, b) => sum + (Number(b.amount) || 0), 0),
     avgRating: vendor?.rating ?? 4.7,
-    pending: vendorBookings.filter((b) => b.status === 'Pending').length,
-    recentBookings: vendorBookings.slice(-5).reverse(),
+    pending: allBookings.filter(b => b.status === 'Pending').length,
+    confirmed: allBookings.filter(b => b.status === 'Confirmed').length,
+    completed: allBookings.filter(b => b.status === 'Completed').length,
+    cancelled: allBookings.filter(b => b.status === 'Cancelled').length,
+    recentBookings: allBookings.slice(-5).reverse(),
   });
 });
 
@@ -904,15 +1193,26 @@ router.post('/notifications/read-all', async (req, res) => {
 
 // --- Categories ---
 router.get('/categories', async (_req, res) => {
-  const cats = await db.listCategories();
-  const result = await Promise.all(cats.map(async (cat) => {
-    const services = await db.listServices();
-    return {
-      ...cat, services: services.filter((s) => s.category_id === cat.id).length,
-      status: cat.active === false ? 'inactive' : 'active',
-    };
-  }));
-  res.json(result);
+  try {
+    const result = await withCache('categories:all', 3600, async () => {
+      const [cats, allServices] = await Promise.all([
+        db.listCategories(),
+        db.listServices(),
+      ]);
+      const serviceCounts = allServices.reduce((acc: Record<string, number>, s) => {
+        if (s.category_id) acc[s.category_id] = (acc[s.category_id] || 0) + 1;
+        return acc;
+      }, {});
+      return cats.map(cat => ({
+        ...cat,
+        services: serviceCounts[cat.id] || 0,
+        status: cat.active === false ? 'inactive' : 'active',
+      }));
+    });
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to fetch categories' });
+  }
 });
 
 router.post('/categories', requireRole('admin'), async (req, res) => {
@@ -926,6 +1226,7 @@ router.post('/categories', requireRole('admin'), async (req, res) => {
     active: req.body.active !== false && req.body.status !== 'inactive', created_at: now(), updated_at: now(),
   };
   await db.createCategory(cat);
+  await cacheDel('categories:all');
   res.status(201).json({ ...cat, services: 0, status: cat.active ? 'active' : 'inactive' });
 });
 
@@ -942,6 +1243,7 @@ router.patch('/categories/:id', requireRole('admin'), async (req, res) => {
     active: req.body.status === 'inactive' ? false : req.body.status === 'active' ? true : req.body.active ?? undefined,
   });
   if (updated) {
+    await cacheDel('categories:all');
     const services = await db.listServices();
     res.json({ ...updated, services: services.filter((s) => s.category_id === updated.id).length, status: updated.active ? 'active' : 'inactive' });
   }
@@ -950,6 +1252,7 @@ router.patch('/categories/:id', requireRole('admin'), async (req, res) => {
 router.delete('/categories/:id', requireRole('admin'), async (req, res) => {
   const removed = await db.deleteCategory(req.params.id);
   if (!removed) return res.status(404).json({ message: 'Category not found' });
+  await cacheDel('categories:all');
   res.json(removed);
 });
 
@@ -1216,7 +1519,8 @@ router.patch('/vendor/profile', requireRole('vendor', 'admin'), async (req: any,
 
 router.get('/vendor/bookings', requireRole('vendor', 'admin'), async (req: any, res) => {
   const vendorId = await resolveVendorId(req);
-  res.json(await db.listBookings({ vendorId }));
+  const bookings = await db.listBookings({ vendorId });
+  res.json(await Promise.all(bookings.map(decorateBooking)));
 });
 
 router.get('/vendor/calendar', requireRole('vendor', 'admin'), async (req: any, res) => {
@@ -1248,7 +1552,7 @@ router.post('/vendor/services', requireRole('vendor', 'admin'), async (req: any,
   const vendorId = await resolveVendorId(req);
   const name = String(req.body.name || '').trim();
   if (!name) return res.status(400).json({ message: 'Service name is required' });
-  const garage = await db.listGarages({ vendorId });
+  const { data: garage } = await db.listGarages({ vendorId });
   const catSlug = slugify(req.body.category || '');
   const cat = catSlug ? await db.findCategoryBySlug(catSlug) : null;
   const service = {
@@ -1310,6 +1614,52 @@ router.delete('/vendor/staff/:id', requireRole('vendor', 'admin'), async (req, r
   res.json(removed);
 });
 
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
+
+router.get('/vendor/kyv', requireRole('vendor'), async (req: any, res) => {
+  try {
+    const vendorId = await resolveVendorId(req);
+    res.json(await db.listKyvDocuments(vendorId));
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to fetch KYV documents' });
+  }
+});
+
+router.post('/kyv/upload', requireRole('vendor'), upload.single('document'), async (req: any, res) => {
+  try {
+    const vendorId = await resolveVendorId(req);
+    if (!req.file) return res.status(400).json({ message: 'No file uploaded' });
+
+    const supabase = db.getClient();
+    let fileUrl = '';
+
+    if (supabase) {
+      const fileName = `${vendorId}/${Date.now()}-${req.file.originalname}`;
+      const { data, error } = await supabase.storage
+        .from('kyv-documents')
+        .upload(fileName, req.file.buffer, { contentType: req.file.mimetype });
+      if (!error) {
+        const { data: urlData } = supabase.storage.from('kyv-documents').getPublicUrl(fileName);
+        fileUrl = urlData.publicUrl;
+      }
+    } else {
+      fileUrl = `/uploads/kyv/${Date.now()}-${req.file.originalname}`;
+    }
+
+    const doc = {
+      id: db.generateId('kyv'), vendor_id: vendorId,
+      document_type: req.body.documentType || 'trade-license',
+      file_name: req.file.originalname, file_url: fileUrl,
+      status: 'pending', created_at: now(), updated_at: now(),
+    };
+    const created = await db.createKyvDocument(doc);
+    res.status(201).json(created);
+  } catch (error) {
+    console.error('[KYV Upload] Error:', error);
+    res.status(500).json({ message: 'Upload failed' });
+  }
+});
+
 router.get('/vendor/promotions', requireRole('vendor', 'admin'), async (req: any, res) => {
   const vendorId = await resolveVendorId(req);
   res.json(await db.listPromotions(vendorId));
@@ -1321,6 +1671,11 @@ router.post('/vendor/promotions', requireRole('vendor', 'admin'), async (req: an
     id: db.generateId('promo'), vendor_id: vendorId, title: req.body.title || 'Promotion',
     description: req.body.description, discount_type: req.body.discountType || req.body.discount_type,
     discount_value: Number(req.body.discountValue || req.body.discount_value || 0),
+    promo_code: req.body.promoCode || req.body.promo_code,
+    usage_limit: req.body.usageLimit ? Number(req.body.usageLimit) : undefined,
+    used_count: 0,
+    starts_at: req.body.startsAt || req.body.starts_at,
+    ends_at: req.body.endsAt || req.body.ends_at,
     status: req.body.status || 'active', created_at: now(), updated_at: now(),
   };
   res.status(201).json(await db.createPromotion(entry));
@@ -1336,6 +1691,35 @@ router.delete('/vendor/promotions/:id', requireRole('vendor', 'admin'), async (r
   const removed = await db.deletePromotion(req.params.id);
   if (!removed) return res.status(404).json({ message: 'Promotion not found' });
   res.json(removed);
+});
+
+router.post('/promotions/validate', async (req, res) => {
+  const { code, amount, vendorId } = req.body;
+  if (!code) return res.status(400).json({ message: 'Code required' });
+
+  const promos = await db.listPromotions(vendorId || undefined);
+  const promo = promos.find(p =>
+    p.promo_code?.toLowerCase() === code.toLowerCase() &&
+    p.status === 'active' &&
+    (!p.starts_at || new Date(p.starts_at) <= new Date()) &&
+    (!p.ends_at || new Date(p.ends_at) >= new Date()) &&
+    (!p.usage_limit || (p.used_count || 0) < p.usage_limit)
+  );
+
+  if (!promo) return res.status(404).json({ message: 'Invalid or expired promo code' });
+
+  const discountAmount = promo.discount_type === 'percent'
+    ? Math.round((amount * (promo.discount_value || 0)) / 100)
+    : Math.min(promo.discount_value || 0, amount);
+
+  res.json({
+    valid: true,
+    promoId: promo.id,
+    discountAmount,
+    discountType: promo.discount_type,
+    discountValue: promo.discount_value,
+    finalAmount: amount - discountAmount,
+  });
 });
 
 router.get('/vendor/kyv', requireRole('vendor', 'admin'), async (req: any, res) => {
@@ -1364,7 +1748,8 @@ router.get('/admin/vendors', requireRole('admin'), async (_req, res) => {
 });
 
 router.get('/admin/bookings', requireRole('admin'), async (_req, res) => {
-  res.json(await db.listBookings());
+  const bookings = await db.listBookings();
+  res.json(await Promise.all(bookings.map(decorateBooking)));
 });
 
 router.get('/admin/categories', requireRole('admin'), async (_req, res) => {
@@ -1400,8 +1785,9 @@ router.get('/admin/settings', requireRole('admin'), async (_req, res) => {
   res.json(await db.getSettings());
 });
 
-router.get('/admin/kyv', requireRole('admin'), async (_req, res) => {
-  res.json(await db.listKyvDocuments());
+router.get('/admin/kyv', requireRole('admin'), async (req, res) => {
+  const vendorId = req.query.vendorId ? String(req.query.vendorId) : undefined;
+  res.json(await db.listKyvDocuments(vendorId));
 });
 
 router.get('/admin/pricing', requireRole('admin'), async (_req, res) => {
@@ -1514,6 +1900,46 @@ router.patch('/admin/support/:id', requireRole('admin'), async (req, res) => {
   res.json(updated);
 });
 
+router.get('/support/tickets', requireRole('customer', 'admin'), async (req: any, res) => {
+  try {
+    const tickets = await db.listSupportTickets();
+    if (req.user.role === 'customer') {
+      return res.json(tickets.filter((t) => t.user_id === req.user.id));
+    }
+    res.json(tickets);
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to fetch tickets' });
+  }
+});
+
+router.post('/support/tickets', requireRole('customer'), async (req: any, res) => {
+  try {
+    const { subject, message, priority = 'medium' } = req.body;
+    if (!subject || !message) {
+      return res.status(400).json({ message: 'Subject and message are required' });
+    }
+    const ticket = {
+      id: db.generateId('ticket'), user_id: req.user.id,
+      subject, message, status: 'open', priority,
+      created_at: now(), updated_at: now(),
+    };
+    const created = await db.createSupportTicket(ticket);
+    res.status(201).json(created);
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to create ticket' });
+  }
+});
+
+router.patch('/support/tickets/:id', requireRole('customer', 'admin'), async (req: any, res) => {
+  try {
+    const ticket = await db.updateSupportTicket(req.params.id, { ...req.body });
+    if (!ticket) return res.status(404).json({ message: 'Ticket not found' });
+    res.json(ticket);
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to update ticket' });
+  }
+});
+
 router.post('/admin/pricing', requireRole('admin'), async (req, res) => {
   const rule = {
     id: db.generateId('price'), vendor_id: req.body.vendorId || '', category_id: req.body.categoryId || '',
@@ -1538,13 +1964,100 @@ router.delete('/admin/pricing/:id', requireRole('admin'), async (req, res) => {
 router.patch('/admin/kyv/:id/approve', requireRole('admin'), async (req, res) => {
   const updated = await db.updateKyvDocument(req.params.id, { status: 'approved', reviewed_by: (req as any).user?.id });
   if (!updated) return res.status(404).json({ message: 'KYV document not found' });
+  
+  const vendor = await db.findVendorById(updated.vendor_id);
+  const user = vendor ? await db.findUserById(vendor.user_id) : null;
+  if (user) {
+    await db.createNotification({
+      id: db.generateId('notif'), user_id: user.email, type: 'kyv_approved', title: 'KYV Approved',
+      body: `Your KYV document ${updated.document_type} has been approved.`, is_read: false, created_at: now(),
+    });
+    try {
+      await sendMail({
+        to: user.email,
+        subject: `KYV Document Approved: ${updated.document_type}`,
+        text: `Hi ${user.full_name || 'Vendor'},\n\nYour KYV document for ${updated.document_type} has been approved by our administrators.\n\nThanks,\nCarServ Team`,
+        html: `<p>Hi ${user.full_name || 'Vendor'},</p><p>Your KYV document for <strong>${updated.document_type}</strong> has been approved by our administrators.</p><p>Thanks,<br/>CarServ Team</p>`
+      });
+    } catch (err) {
+      console.error('[Mail] Failed to send KYV approval email:', err);
+    }
+  }
   res.json(updated);
 });
 
 router.post('/admin/kyv/:id/reject', requireRole('admin'), async (req, res) => {
   const updated = await db.updateKyvDocument(req.params.id, { status: 'rejected', review_note: req.body.reason || '' });
   if (!updated) return res.status(404).json({ message: 'KYV document not found' });
+  
+  const vendor = await db.findVendorById(updated.vendor_id);
+  const user = vendor ? await db.findUserById(vendor.user_id) : null;
+  if (user) {
+    await db.createNotification({
+      id: db.generateId('notif'), user_id: user.email, type: 'kyv_rejected', title: 'KYV Rejected',
+      body: `Your KYV document ${updated.document_type} has been rejected. Reason: ${req.body.reason || 'None provided'}.`, is_read: false, created_at: now(),
+    });
+    try {
+      await sendMail({
+        to: user.email,
+        subject: `KYV Document Rejected: ${updated.document_type}`,
+        text: `Hi ${user.full_name || 'Vendor'},\n\nYour KYV document for ${updated.document_type} has been rejected.\nReason: ${req.body.reason || 'None provided'}\n\nPlease re-upload a valid document.\n\nThanks,\nCarServ Team`,
+        html: `<p>Hi ${user.full_name || 'Vendor'},</p><p>Your KYV document for <strong>${updated.document_type}</strong> has been rejected.</p><p><strong>Reason:</strong> ${req.body.reason || 'None provided'}</p><p>Please re-upload a valid document.</p><p>Thanks,<br/>CarServ Team</p>`
+      });
+    } catch (err) {
+      console.error('[Mail] Failed to send KYV rejection email:', err);
+    }
+  }
   res.json(updated);
+});
+
+router.get('/admin/stats', requireRole('admin'), async (_req, res) => {
+  try {
+    const [users, vendors, bookings, payments, kyvDocs, tickets] = await Promise.all([
+      db.listUsers(),
+      db.listVendors(),
+      db.listBookings({}),
+      db.listPayments(),
+      db.listKyvDocuments(),
+      db.listSupportTickets(),
+    ]);
+
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+
+    const thisMonthBookings = bookings.filter(b => {
+      const d = new Date(b.created_at || b.scheduled_date);
+      return d >= monthStart;
+    });
+
+    const lastMonthBookings = bookings.filter(b => {
+      const d = new Date(b.created_at || b.scheduled_date);
+      return d >= lastMonthStart && d < monthStart;
+    });
+
+    const gmv = payments
+      .filter(p => p.status === 'paid' || p.status === 'succeeded')
+      .reduce((sum, p) => sum + Number(p.amount), 0);
+
+    const bookingGrowth = lastMonthBookings.length > 0
+      ? Math.round(((thisMonthBookings.length - lastMonthBookings.length) / lastMonthBookings.length) * 100)
+      : 0;
+
+    res.json({
+      totalBookings: bookings.length,
+      thisMonthBookings: thisMonthBookings.length,
+      bookingGrowthPct: bookingGrowth,
+      platformGmv: Math.round(gmv),
+      activeVendors: vendors.filter(v => v.active).length,
+      totalUsers: users.filter(u => u.role === 'customer').length,
+      pendingKyv: kyvDocs.filter(d => d.status === 'pending').length,
+      openTickets: tickets.filter(t => t.status === 'open').length,
+    });
+  } catch (error) {
+    console.error('[AdminStats] Failed to fetch admin stats:', error);
+    res.status(500).json({ message: 'Failed to fetch admin stats' });
+  }
 });
 
 router.get('/admin/analytics', requireRole('admin'), async (_req, res) => {

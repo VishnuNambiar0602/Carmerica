@@ -1,25 +1,28 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 
-function isTokenExpired(token: string): boolean {
-  try {
-    const payload = JSON.parse(atob(token.split('.')[1]));
-    if (payload.exp && payload.exp * 1000 < Date.now()) {
-      return true;
-    }
-    return false;
-  } catch {
-    return true;
-  }
-}
-
 export function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const token = localStorage.getItem('token');
+  const [authStatus, setAuthStatus] = useState<'loading' | 'ok' | 'unauth'>('loading');
   const location = useLocation();
 
-  if (!token || isTokenExpired(token)) {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
+  useEffect(() => {
+    fetch('/api/auth/me')
+      .then((r) => {
+        if (r.ok) setAuthStatus('ok');
+        else setAuthStatus('unauth');
+      })
+      .catch(() => setAuthStatus('unauth'));
+  }, []);
+
+  if (authStatus === 'loading') {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#0071c2]"></div>
+      </div>
+    );
+  }
+
+  if (authStatus === 'unauth') {
     return <Navigate to={`/login?redirect=${encodeURIComponent(location.pathname + location.search)}`} replace />;
   }
 
@@ -27,43 +30,64 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
 }
 
 export function VendorProtectedRoute({ children }: { children: React.ReactNode }) {
-  const token = localStorage.getItem('token');
+  const [authStatus, setAuthStatus] = useState<'loading' | 'ok' | 'unauth'>('loading');
   const location = useLocation();
 
-  if (!token || isTokenExpired(token)) {
-    localStorage.removeItem('token');
-    localStorage.removeItem('vendor');
-    return <Navigate to={`/vendor/login?redirect=${encodeURIComponent(location.pathname + location.search)}`} replace />;
+  useEffect(() => {
+    fetch('/api/auth/me')
+      .then((r) => {
+        if (!r.ok) throw new Error();
+        return r.json();
+      })
+      .then((data) => {
+        if (data?.user?.role === 'vendor') setAuthStatus('ok');
+        else setAuthStatus('unauth');
+      })
+      .catch(() => setAuthStatus('unauth'));
+  }, []);
+
+  if (authStatus === 'loading') {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#003580]"></div>
+      </div>
+    );
   }
 
-  try {
-    const payload = JSON.parse(atob(token.split('.')[1]));
-    if (payload.role !== 'vendor') {
-      return <Navigate to="/vendor/login" replace />;
-    }
-  } catch {
-    return <Navigate to="/vendor/login" replace />;
+  if (authStatus === 'unauth') {
+    return <Navigate to={`/vendor/login?redirect=${encodeURIComponent(location.pathname + location.search)}`} replace />;
   }
 
   return <>{children}</>;
 }
 
 export function AdminProtectedRoute({ children }: { children: React.ReactNode }) {
-  const token = localStorage.getItem('token');
+  const [authStatus, setAuthStatus] = useState<'loading' | 'ok' | 'unauth'>('loading');
   const location = useLocation();
 
-  if (!token || isTokenExpired(token)) {
-    localStorage.removeItem('token');
-    return <Navigate to={`/admin/login?redirect=${encodeURIComponent(location.pathname + location.search)}`} replace />;
+  useEffect(() => {
+    fetch('/api/auth/me')
+      .then((r) => {
+        if (!r.ok) throw new Error();
+        return r.json();
+      })
+      .then((data) => {
+        if (data?.user?.role === 'admin') setAuthStatus('ok');
+        else setAuthStatus('unauth');
+      })
+      .catch(() => setAuthStatus('unauth'));
+  }, []);
+
+  if (authStatus === 'loading') {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-900">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#feba02]"></div>
+      </div>
+    );
   }
 
-  try {
-    const payload = JSON.parse(atob(token.split('.')[1]));
-    if (payload.role !== 'admin') {
-      return <Navigate to="/admin/login" replace />;
-    }
-  } catch {
-    return <Navigate to="/admin/login" replace />;
+  if (authStatus === 'unauth') {
+    return <Navigate to={`/admin/login?redirect=${encodeURIComponent(location.pathname + location.search)}`} replace />;
   }
 
   return <>{children}</>;

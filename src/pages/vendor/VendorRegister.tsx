@@ -16,8 +16,8 @@ const VendorRegister = () => {
       });
       const data = await res.json();
       if (res.ok) {
-        setStatus('Registration successful. You can now sign in.');
-        setTimeout(() => navigate('/vendor/login'), 1200);
+        setStatus('Registration successful. Please check your email to verify your account before logging in.');
+        setTimeout(() => navigate('/vendor/login?verify_needed=1'), 4000);
       } else {
         setStatus(data.message || 'Registration failed');
       }

@@ -21,11 +21,102 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '../../lib/utils';
+import { loadStripe } from '@stripe/stripe-js';
+import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
+
+const CardPaymentForm = ({ onConfirm, isSubmitting }: { onConfirm: (stripe: any, elements: any) => Promise<void>; isSubmitting: boolean }) => {
+  const stripe = useStripe();
+  const elements = useElements();
+  const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!stripe || !elements) return;
+    try {
+      await onConfirm(stripe, elements);
+    } catch (err: any) {
+      setErrorMessage(err.message || 'An unexpected error occurred.');
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-6">
+      <PaymentElement />
+      {errorMessage && <div className="text-sm text-red-600 font-bold">{errorMessage}</div>}
+      <button 
+        type="submit"
+        disabled={isSubmitting || !stripe || !elements}
+        className="w-full bg-red-600 text-white px-10 py-4 rounded-2xl font-bold hover:bg-red-700 flex items-center justify-center shadow-xl shadow-red-600/20 transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
+      >
+        {isSubmitting ? 'Processing Payment...' : 'Confirm & Pay Now'} <Lock className="h-5 w-5 ml-2" />
+      </button>
+    </form>
+  );
+};
+
+const MockCreditCard = ({ number, name, expiry, cvv, tilt }: { number: string; name: string; expiry: string; cvv: string; tilt: { x: number; y: number } }) => {
+  return (
+    <div 
+      style={{
+        transform: `perspective(1000px) rotateX(${tilt.x}deg) rotateY(${tilt.y}deg)`,
+        transition: 'transform 0.1s ease-out',
+        transformStyle: 'preserve-3d',
+      }}
+      className="w-full max-w-md h-56 mx-auto rounded-3xl bg-gradient-to-br from-gray-900 to-gray-800 p-6 text-white shadow-2xl relative overflow-hidden flex flex-col justify-between mb-8 select-none"
+    >
+      <div className="absolute top-0 right-0 w-64 h-full bg-white/5 skew-x-12 pointer-events-none" />
+      <div className="flex justify-between items-start">
+        <div className="space-y-1">
+          <p className="text-[10px] font-bold tracking-widest text-gray-400 uppercase">Premium Member</p>
+          <div className="h-8 w-12 bg-yellow-400/80 rounded-lg flex items-center justify-center font-bold text-gray-900 shadow-inner text-xs">CHIP</div>
+        </div>
+        <CreditCard className="h-10 w-10 text-white/30" />
+      </div>
+      <div>
+        <p className="text-xl font-mono tracking-widest text-center py-2">
+          {number || '•••• •••• •••• ••••'}
+        </p>
+      </div>
+      <div className="flex justify-between items-end">
+        <div>
+          <p className="text-[9px] text-gray-400 font-bold uppercase tracking-wider">Cardholder</p>
+          <p className="text-sm font-bold tracking-wide">{name || 'YOUR NAME'}</p>
+        </div>
+        <div className="flex gap-4">
+          <div>
+            <p className="text-[9px] text-gray-400 font-bold uppercase tracking-wider">Expires</p>
+            <p className="text-sm font-bold tracking-wide">{expiry || 'MM/YY'}</p>
+          </div>
+          <div>
+            <p className="text-[9px] text-gray-400 font-bold uppercase tracking-wider">CVV</p>
+            <p className="text-sm font-bold tracking-wide">{cvv || '•••'}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 const Checkout = () => {
   const navigate = useNavigate();
   const [step, setStep] = React.useState(1);
   const [showBundles, setShowBundles] = React.useState(true);
+
+  const [paymentMethod, setPaymentMethod] = React.useState<'garage' | 'card'>('garage');
+  const [pendingBookingId, setPendingBookingId] = React.useState<string | null>(null);
+  const [clientSecret, setClientSecret] = React.useState<string | null>(null);
+  const [stripePromise, setStripePromise] = React.useState<any>(null);
+
+  React.useEffect(() => {
+    fetch('/api/payments/config')
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.publishableKey) {
+          setStripePromise(loadStripe(data.publishableKey));
+        }
+      })
+      .catch((err) => console.error('Failed to load Stripe config', err));
+  }, []);
   const [firstName, setFirstName] = React.useState('');
   const [lastName, setLastName] = React.useState('');
   const [email, setEmail] = React.useState('');
@@ -47,6 +138,17 @@ const Checkout = () => {
   const [availableSlots, setAvailableSlots] = React.useState<string[]>([]);
   const [loadingSlots, setLoadingSlots] = React.useState(false);
   const [errors, setErrors] = React.useState<Record<string, string>>({});
+
+  // 3D Tilt states
+  const [garageTilt, setGarageTilt] = React.useState({ x: 0, y: 0 });
+  const [cardTilt, setCardTilt] = React.useState({ x: 0, y: 0 });
+  const [mockCardTilt, setMockCardTilt] = React.useState({ x: 0, y: 0 });
+
+  // Mock Card states
+  const [mockCardNum, setMockCardNum] = React.useState('');
+  const [mockCardName, setMockCardName] = React.useState('');
+  const [mockCardExp, setMockCardExp] = React.useState('');
+  const [mockCardCvv, setMockCardCvv] = React.useState('');
 
   React.useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -109,11 +211,134 @@ const Checkout = () => {
     return Object.keys(newErrors).length === 0;
   }
 
+  const handleSelectCardPayment = async () => {
+    setPaymentMethod('card');
+    if (clientSecret) return; // already loaded
+
+    setErrors({});
+    setIsSubmitting(true);
+    try {
+      const finalPrice = total;
+      const payload = {
+        firstName,
+        lastName,
+        email,
+        phone,
+        carModel,
+        carYear,
+        license,
+        date,
+        time,
+        service: service?.name || serviceParam || 'General Service',
+        serviceId: service?.id || '',
+        price: finalPrice,
+        vendorId: garage?.vendor_id || 'vendor-1',
+        garageId: garage?.id || vendorIdParam || 'garage-1',
+        promoId: promoResult?.promoId || undefined
+      };
+      
+      const token = localStorage.getItem('token');
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
+      // Create the pending booking
+      const res = await fetch('/api/bookings', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (res.ok && data.id) {
+        setPendingBookingId(data.id);
+        
+        // Fetch payment intent secret
+        const intentRes = await fetch('/api/payments/create-intent', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ amount: finalPrice, currency: 'aed', bookingId: data.id })
+        });
+        const intentData = await intentRes.json();
+        if (intentRes.ok && intentData.clientSecret) {
+          setClientSecret(intentData.clientSecret);
+        } else {
+          alert('Failed to initialize payment gateway.');
+          setPaymentMethod('garage');
+        }
+      } else {
+        alert(data.message || 'Failed to create booking.');
+        setPaymentMethod('garage');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Network error initializing card payment.');
+      setPaymentMethod('garage');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleConfirmCardPayment = async (stripe: any, elements: any) => {
+    setIsSubmitting(true);
+    try {
+      const { error } = await stripe.confirmPayment({
+        elements,
+        confirmParams: {
+          return_url: `${window.location.origin}/confirmation?bookingId=${pendingBookingId}`,
+        },
+      });
+      if (error) {
+        alert(error.message || 'Payment confirmation failed.');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Failed to process payment.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const [promoCode, setPromoCode] = React.useState('');
+  const [promoResult, setPromoResult] = React.useState<any>(null);
+  const [promoError, setPromoError] = React.useState('');
+  const [isApplyingPromo, setIsApplyingPromo] = React.useState(false);
+
   const servicePrice = service?.price || priceParam || 0;
-  const tax = Math.round(servicePrice * 0.05 * 100) / 100;
-  const total = Math.round((servicePrice + tax) * 100) / 100;
+  const discount = promoResult?.discountAmount || 0;
+  const discountedPrice = Math.max(0, servicePrice - discount);
+  const tax = Math.round(discountedPrice * 0.05 * 100) / 100;
+  const total = Math.round((discountedPrice + tax) * 100) / 100;
   const hasSavings = service?.marketPrice && service.marketPrice > service.price;
   const savings = hasSavings ? Math.round((service.marketPrice - service.price) * 100) / 100 : 0;
+
+  async function applyPromo() {
+    if (!promoCode.trim()) return;
+    setIsApplyingPromo(true);
+    setPromoError('');
+    try {
+      const res = await fetch('/api/promotions/validate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: promoCode, amount: servicePrice, vendorId: garage?.vendor_id || vendorIdParam }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setPromoResult(data);
+        setPromoError('');
+      } else {
+        setPromoError(data.message || 'Invalid or expired promo code');
+        setPromoResult(null);
+      }
+    } catch (err) {
+      setPromoError('Failed to validate promo code');
+      setPromoResult(null);
+    } finally {
+      setIsApplyingPromo(false);
+    }
+  }
 
   const steps = [
     { id: 1, name: 'Your Details', icon: User },
@@ -198,22 +423,22 @@ const Checkout = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                   <div className="space-y-3">
                     <label className="text-xs font-bold text-gray-400 uppercase tracking-widest">First Name</label>
-                    <input value={firstName} onChange={(e) => setFirstName(e.target.value)} type="text" placeholder="e.g. John" className={cn("w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl focus:bg-white focus:border-red-600 outline-none transition-all font-medium", errors.firstName && "border-red-600 focus:border-red-600 bg-red-50/10")} />
+                    <input value={firstName} onChange={(e) => { setFirstName(e.target.value); setErrors(prev => ({ ...prev, firstName: '' })); }} type="text" placeholder="e.g. John" className={cn("w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl focus:bg-white focus:border-red-600 outline-none transition-all font-medium", errors.firstName && "border-red-600 focus:border-red-600 bg-red-50/10")} />
                     {errors.firstName && <p className="text-xs text-red-600 font-bold">{errors.firstName}</p>}
                   </div>
                   <div className="space-y-3">
                     <label className="text-xs font-bold text-gray-400 uppercase tracking-widest">Last Name</label>
-                    <input value={lastName} onChange={(e) => setLastName(e.target.value)} type="text" placeholder="e.g. Doe" className={cn("w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl focus:bg-white focus:border-red-600 outline-none transition-all font-medium", errors.lastName && "border-red-600 focus:border-red-600 bg-red-50/10")} />
+                    <input value={lastName} onChange={(e) => { setLastName(e.target.value); setErrors(prev => ({ ...prev, lastName: '' })); }} type="text" placeholder="e.g. Doe" className={cn("w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl focus:bg-white focus:border-red-600 outline-none transition-all font-medium", errors.lastName && "border-red-600 focus:border-red-600 bg-red-50/10")} />
                     {errors.lastName && <p className="text-xs text-red-600 font-bold">{errors.lastName}</p>}
                   </div>
                   <div className="space-y-3">
                     <label className="text-xs font-bold text-gray-400 uppercase tracking-widest">Email Address</label>
-                    <input value={email} onChange={(e) => setEmail(e.target.value)} type="email" placeholder="e.g. john@example.com" className={cn("w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl focus:bg-white focus:border-red-600 outline-none transition-all font-medium", errors.email && "border-red-600 focus:border-red-600 bg-red-50/10")} />
+                    <input value={email} onChange={(e) => { setEmail(e.target.value); setErrors(prev => ({ ...prev, email: '' })); }} type="email" placeholder="e.g. john@example.com" className={cn("w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl focus:bg-white focus:border-red-600 outline-none transition-all font-medium", errors.email && "border-red-600 focus:border-red-600 bg-red-50/10")} />
                     {errors.email && <p className="text-xs text-red-600 font-bold">{errors.email}</p>}
                   </div>
                   <div className="space-y-3">
                     <label className="text-xs font-bold text-gray-400 uppercase tracking-widest">Phone Number</label>
-                    <input value={phone} onChange={(e) => setPhone(e.target.value)} type="tel" placeholder="e.g. +971 50 123 4567" className={cn("w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl focus:bg-white focus:border-red-600 outline-none transition-all font-medium", errors.phone && "border-red-600 focus:border-red-600 bg-red-50/10")} />
+                    <input value={phone} onChange={(e) => { setPhone(e.target.value); setErrors(prev => ({ ...prev, phone: '' })); }} type="tel" placeholder="e.g. +971 50 123 4567" className={cn("w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl focus:bg-white focus:border-red-600 outline-none transition-all font-medium", errors.phone && "border-red-600 focus:border-red-600 bg-red-50/10")} />
                     {errors.phone && <p className="text-xs text-red-600 font-bold">{errors.phone}</p>}
                   </div>
                 </div>
@@ -248,12 +473,12 @@ const Checkout = () => {
                   </div>
                   <div className="space-y-3">
                     <label className="text-xs font-bold text-gray-400 uppercase tracking-widest">Model</label>
-                    <input value={carModel} onChange={(e) => setCarModel(e.target.value)} type="text" placeholder="e.g. Camry" className={cn("w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl focus:bg-white focus:border-red-600 outline-none transition-all font-medium", errors.carModel && "border-red-600 focus:border-red-600 bg-red-50/10")} />
+                    <input value={carModel} onChange={(e) => { setCarModel(e.target.value); setErrors(prev => ({ ...prev, carModel: '' })); }} type="text" placeholder="e.g. Camry" className={cn("w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl focus:bg-white focus:border-red-600 outline-none transition-all font-medium", errors.carModel && "border-red-600 focus:border-red-600 bg-red-50/10")} />
                     {errors.carModel && <p className="text-xs text-red-600 font-bold">{errors.carModel}</p>}
                   </div>
                   <div className="space-y-3">
                     <label className="text-xs font-bold text-gray-400 uppercase tracking-widest">Year</label>
-                    <input value={carYear} onChange={(e) => setCarYear(e.target.value)} type="number" placeholder="e.g. 2022" className={cn("w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl focus:bg-white focus:border-red-600 outline-none transition-all font-medium", errors.carYear && "border-red-600 focus:border-red-600 bg-red-50/10")} />
+                    <input value={carYear} onChange={(e) => { setCarYear(e.target.value); setErrors(prev => ({ ...prev, carYear: '' })); }} type="number" placeholder="e.g. 2022" className={cn("w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl focus:bg-white focus:border-red-600 outline-none transition-all font-medium", errors.carYear && "border-red-600 focus:border-red-600 bg-red-50/10")} />
                     {errors.carYear && <p className="text-xs text-red-600 font-bold">{errors.carYear}</p>}
                   </div>
                   <div className="space-y-3">
@@ -274,7 +499,7 @@ const Checkout = () => {
                         min={new Date().toISOString().split('T')[0]}
                         max={new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]}
                         value={date}
-                        onChange={(e) => setDate(e.target.value)}
+                        onChange={(e) => { setDate(e.target.value); setErrors(prev => ({ ...prev, date: '' })); }}
                         className={cn("w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl focus:bg-white focus:border-red-600 outline-none transition-all font-medium", errors.date && "border-red-600")}
                       />
                       {errors.date && <p className="text-xs text-red-600 font-bold">{errors.date}</p>}
@@ -290,11 +515,11 @@ const Checkout = () => {
                         <p className="text-sm text-red-500 py-4 font-bold">No slots available for this date</p>
                       ) : (
                         <div className="grid grid-cols-3 gap-2 max-h-40 overflow-y-auto pr-2">
-                          {availableSlots.map((slot) => (
+                           {availableSlots.map((slot) => (
                             <button
                               key={slot}
                               type="button"
-                              onClick={() => setTime(slot)}
+                              onClick={() => { setTime(slot); setErrors(prev => ({ ...prev, time: '' })); }}
                               className={cn(
                                 "p-3 rounded-xl text-xs font-bold border transition-all text-center",
                                 time === slot
@@ -338,100 +563,295 @@ const Checkout = () => {
                   </div>
                 </div>
                 <div className="space-y-4">
-                  <div className="p-6 border-2 border-red-600 bg-red-50/30 rounded-3xl flex items-center group cursor-pointer transition-all">
-                    <div className="h-6 w-6 rounded-full border-2 border-red-600 flex items-center justify-center">
-                      <div className="h-3 w-3 bg-red-600 rounded-full" />
+                  <div 
+                    onClick={() => {
+                      setPaymentMethod('garage');
+                      setClientSecret(null);
+                    }}
+                    onMouseMove={(e) => {
+                      const card = e.currentTarget;
+                      const box = card.getBoundingClientRect();
+                      const x = e.clientX - box.left - box.width / 2;
+                      const y = e.clientY - box.top - box.height / 2;
+                      const factorX = 10 / (box.height / 2);
+                      const factorY = 10 / (box.width / 2);
+                      setGarageTilt({ x: -y * factorX, y: x * factorY });
+                    }}
+                    onMouseLeave={() => setGarageTilt({ x: 0, y: 0 })}
+                    style={{
+                      transform: `perspective(1000px) rotateX(${garageTilt.x}deg) rotateY(${garageTilt.y}deg)`,
+                      transition: 'transform 0.15s ease-out',
+                      transformStyle: 'preserve-3d',
+                    }}
+                    className={cn(
+                      "p-6 border-2 rounded-3xl flex items-center group cursor-pointer transition-all hover:shadow-lg",
+                      paymentMethod === 'garage' 
+                        ? "border-red-600 bg-red-50/30 shadow-md" 
+                        : "border-gray-100 bg-white"
+                    )}
+                  >
+                    <div className={cn(
+                      "h-6 w-6 rounded-full border-2 flex items-center justify-center",
+                      paymentMethod === 'garage' ? "border-red-600" : "border-gray-200"
+                    )}>
+                      {paymentMethod === 'garage' && <div className="h-3 w-3 bg-red-600 rounded-full" />}
                     </div>
                     <div className="ml-6 grow">
                       <p className="font-bold text-gray-900">Pay at Garage</p>
                       <p className="text-sm text-gray-500">No payment required now. Pay after service completion.</p>
                     </div>
-                    <DollarSign className="h-8 w-8 text-red-600" />
+                    <DollarSign className={cn("h-8 w-8 transition-colors", paymentMethod === 'garage' ? "text-red-600" : "text-gray-400")} />
                   </div>
-                  <div className="p-6 border border-gray-100 rounded-3xl flex items-center opacity-50 cursor-not-allowed grayscale">
-                    <div className="h-6 w-6 rounded-full border-2 border-gray-200" />
+
+                  <div 
+                    onClick={handleSelectCardPayment}
+                    onMouseMove={(e) => {
+                      const card = e.currentTarget;
+                      const box = card.getBoundingClientRect();
+                      const x = e.clientX - box.left - box.width / 2;
+                      const y = e.clientY - box.top - box.height / 2;
+                      const factorX = 10 / (box.height / 2);
+                      const factorY = 10 / (box.width / 2);
+                      setCardTilt({ x: -y * factorX, y: x * factorY });
+                    }}
+                    onMouseLeave={() => setCardTilt({ x: 0, y: 0 })}
+                    style={{
+                      transform: `perspective(1000px) rotateX(${cardTilt.x}deg) rotateY(${cardTilt.y}deg)`,
+                      transition: 'transform 0.15s ease-out',
+                      transformStyle: 'preserve-3d',
+                    }}
+                    className={cn(
+                      "p-6 border-2 rounded-3xl flex items-center group cursor-pointer transition-all hover:shadow-lg",
+                      paymentMethod === 'card' 
+                        ? "border-red-600 bg-red-50/30 shadow-md" 
+                        : "border-gray-100 bg-white"
+                    )}
+                  >
+                    <div className={cn(
+                      "h-6 w-6 rounded-full border-2 flex items-center justify-center",
+                      paymentMethod === 'card' ? "border-red-600" : "border-gray-200"
+                    )}>
+                      {paymentMethod === 'card' && <div className="h-3 w-3 bg-red-600 rounded-full" />}
+                    </div>
                     <div className="ml-6 grow">
                       <p className="font-bold text-gray-900">Credit / Debit Card</p>
-                      <p className="text-sm text-gray-500">Secure online payment (Coming Soon)</p>
+                      <p className="text-sm text-gray-500">Secure online payment via Stripe Elements</p>
                     </div>
-                    <CreditCard className="h-8 w-8 text-gray-400" />
+                    <CreditCard className={cn("h-8 w-8 transition-colors", paymentMethod === 'card' ? "text-red-600" : "text-gray-400")} />
                   </div>
                 </div>
 
                 <div className="bg-gray-50 p-6 rounded-3xl border border-gray-100 flex items-start">
                   <ShieldCheck className="h-6 w-6 text-green-600 mr-4 mt-0.5" />
                   <p className="text-xs text-gray-500 leading-relaxed">
-                    By clicking "Confirm Booking", you agree to the <span className="text-red-600 font-bold underline cursor-pointer">Terms & Conditions</span> and <span className="text-red-600 font-bold underline cursor-pointer">Cancellation Policy</span>. Your data is protected by our AI Trust Engine.
+                    By clicking "Confirm Booking" / "Pay & Confirm", you agree to the <span className="text-red-600 font-bold underline cursor-pointer">Terms & Conditions</span> and <span className="text-red-600 font-bold underline cursor-pointer">Cancellation Policy</span>. Your data is protected by our AI Trust Engine.
                   </p>
                 </div>
 
-                <div className="pt-8 border-t border-gray-50 flex justify-between items-center">
-                  <button 
-                    onClick={() => setStep(2)}
-                    className="text-gray-400 font-bold hover:text-gray-600 transition-colors uppercase tracking-widest text-xs"
-                  >
-                    Back
-                  </button>
-                  <button 
-                    onClick={async () => {
-                      if (!validate(1)) {
-                        setStep(1);
-                        return;
-                      }
-                      if (!validate(2)) {
-                        setStep(2);
-                        return;
-                      }
-                      if (isSubmitting) return;
-                      setIsSubmitting(true);
-                      try {
-                        const finalPrice = service?.price || priceParam || 0;
-                        const payload = {
-                          firstName,
-                          lastName,
-                          email,
-                          phone,
-                          carModel,
-                          carYear,
-                          license,
-                          date,
-                          time,
-                          service: service?.name || serviceParam || 'General Service',
-                          serviceId: service?.id || '',
-                          price: finalPrice,
-                          vendorId: garage?.vendor_id || 'vendor-1',
-                          garageId: garage?.id || vendorIdParam || 'garage-1'
-                        };
-                        const token = localStorage.getItem('token');
-                        const headers: Record<string, string> = {
-                          'Content-Type': 'application/json',
-                        };
-                        if (token) {
-                          headers['Authorization'] = `Bearer ${token}`;
+                {paymentMethod === 'card' ? (
+                  clientSecret && stripePromise && !clientSecret.startsWith('pi_mock_secret') ? (
+                    <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-md">
+                      <Elements stripe={stripePromise} options={{ clientSecret }}>
+                        <CardPaymentForm onConfirm={handleConfirmCardPayment} isSubmitting={isSubmitting} />
+                      </Elements>
+                    </div>
+                  ) : clientSecret ? (
+                    <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-xl space-y-6">
+                      <div className="text-center mb-6">
+                        <span className="bg-blue-50 text-blue-700 text-xs font-bold px-3 py-1.5 rounded-full uppercase tracking-wider">
+                          Mock Payment Gateway Active
+                        </span>
+                      </div>
+                      <MockCreditCard 
+                        number={mockCardNum} 
+                        name={mockCardName} 
+                        expiry={mockCardExp} 
+                        cvv={mockCardCvv} 
+                        tilt={mockCardTilt} 
+                      />
+                      
+                      <div 
+                        onMouseMove={(e) => {
+                          const card = e.currentTarget;
+                          const box = card.getBoundingClientRect();
+                          const x = e.clientX - box.left - box.width / 2;
+                          const y = e.clientY - box.top - box.height / 2;
+                          const factorX = 8 / (box.height / 2);
+                          const factorY = 8 / (box.width / 2);
+                          setMockCardTilt({ x: -y * factorX, y: x * factorY });
+                        }}
+                        onMouseLeave={() => setMockCardTilt({ x: 0, y: 0 })}
+                        className="space-y-4"
+                      >
+                        <div className="grid grid-cols-1 gap-4">
+                          <div className="space-y-2">
+                            <label className="text-xs font-bold text-gray-400 uppercase tracking-widest">Card Number</label>
+                            <input 
+                              type="text" 
+                              placeholder="4111 2222 3333 4444" 
+                              value={mockCardNum}
+                              onChange={(e) => setMockCardNum(e.target.value.replace(/\s?/g, '').replace(/(\d{4})/g, '$1 ').trim().slice(0, 19))}
+                              className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl focus:bg-white focus:border-red-600 outline-none transition-all font-medium font-mono"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <label className="text-xs font-bold text-gray-400 uppercase tracking-widest">Cardholder Name</label>
+                            <input 
+                              type="text" 
+                              placeholder="John Doe" 
+                              value={mockCardName}
+                              onChange={(e) => setMockCardName(e.target.value)}
+                              className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl focus:bg-white focus:border-red-600 outline-none transition-all font-medium"
+                            />
+                          </div>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                              <label className="text-xs font-bold text-gray-400 uppercase tracking-widest">Expiry Date</label>
+                              <input 
+                                type="text" 
+                                placeholder="MM/YY" 
+                                value={mockCardExp}
+                                onChange={(e) => {
+                                  let val = e.target.value.replace(/\//g, '');
+                                  if (val.length > 2) {
+                                    val = val.slice(0, 2) + '/' + val.slice(2, 4);
+                                  }
+                                  setMockCardExp(val.slice(0, 5));
+                                }}
+                                className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl focus:bg-white focus:border-red-600 outline-none transition-all font-medium font-mono"
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <label className="text-xs font-bold text-gray-400 uppercase tracking-widest">CVV</label>
+                              <input 
+                                type="password" 
+                                placeholder="123" 
+                                value={mockCardCvv}
+                                onChange={(e) => setMockCardCvv(e.target.value.replace(/\D/g, '').slice(0, 3))}
+                                className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl focus:bg-white focus:border-red-600 outline-none transition-all font-medium font-mono"
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="pt-4 border-t border-gray-50 flex justify-between items-center gap-4">
+                          <button 
+                            type="button"
+                            onClick={() => { setPaymentMethod('garage'); setClientSecret(null); }}
+                            className="text-gray-400 font-bold hover:text-gray-600 transition-colors uppercase tracking-widest text-xs"
+                          >
+                            Cancel
+                          </button>
+                          <button 
+                            type="button"
+                            onClick={async () => {
+                              if (!mockCardNum || !mockCardName || !mockCardExp || !mockCardCvv) {
+                                alert('Please fill in all card details.');
+                                return;
+                              }
+                              setIsSubmitting(true);
+                              try {
+                                const confirmRes = await fetch('/api/payments/confirm', {
+                                  method: 'POST',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({ paymentIntentId: clientSecret.replace('_secret_', '_') })
+                                });
+                                if (confirmRes.ok) {
+                                  navigate(`/confirmation?bookingId=${pendingBookingId}`);
+                                } else {
+                                  alert('Payment processing failed.');
+                                }
+                              } catch (err) {
+                                console.error(err);
+                                alert('Network error processing payment.');
+                              } finally {
+                                setIsSubmitting(false);
+                              }
+                            }}
+                            disabled={isSubmitting}
+                            className="bg-red-600 hover:bg-red-700 text-white px-10 py-4 rounded-2xl font-bold flex items-center justify-center shadow-xl shadow-red-600/20 transition-all active:scale-95 cursor-pointer"
+                          >
+                            {isSubmitting ? 'Processing...' : 'Pay & Confirm'} <Lock className="h-5 w-5 ml-2" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-center py-8 text-gray-500 flex flex-col items-center">
+                      <span className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-600 mb-2"></span>
+                      <span>Initializing secure card checkout...</span>
+                    </div>
+                  )
+                ) : (
+                  <div className="pt-8 border-t border-gray-50 flex justify-between items-center">
+                    <button 
+                      onClick={() => setStep(2)}
+                      className="text-gray-400 font-bold hover:text-gray-600 transition-colors uppercase tracking-widest text-xs"
+                    >
+                      Back
+                    </button>
+                    <button 
+                      onClick={async () => {
+                        if (!validate(1)) {
+                          setStep(1);
+                          return;
                         }
-                        const res = await fetch('/api/bookings', {
-                          method: 'POST',
-                          headers,
-                          body: JSON.stringify(payload)
-                        });
-                        const data = await res.json();
-                        if (res.ok) {
-                          navigate('/confirmation');
-                        } else {
-                          alert(data.message || 'Booking failed');
+                        if (!validate(2)) {
+                          setStep(2);
+                          return;
                         }
-                      } catch (err) {
-                        console.error(err);
-                        alert('Network error');
-                      } finally {
-                        setIsSubmitting(false);
-                      }
-                    }}
-                    className="bg-red-600 text-white px-10 py-4 rounded-2xl font-bold hover:bg-red-700 flex items-center shadow-xl shadow-red-600/20 transition-all active:scale-95"
-                  >
-                    {isSubmitting ? 'Confirming...' : 'Confirm Booking'} <Lock className="h-5 w-5 ml-2" />
-                  </button>
-                </div>
+                        if (isSubmitting) return;
+                        setIsSubmitting(true);
+                        try {
+                          const finalPrice = discountedPrice;
+                          const payload = {
+                            firstName,
+                            lastName,
+                            email,
+                            phone,
+                            carModel,
+                            carYear,
+                            license,
+                            date,
+                            time,
+                            service: service?.name || serviceParam || 'General Service',
+                            serviceId: service?.id || '',
+                            price: finalPrice,
+                            vendorId: garage?.vendor_id || 'vendor-1',
+                            garageId: garage?.id || vendorIdParam || 'garage-1',
+                            promoId: promoResult?.promoId || undefined
+                          };
+                          const token = localStorage.getItem('token');
+                          const headers: Record<string, string> = {
+                            'Content-Type': 'application/json',
+                          };
+                          if (token) {
+                            headers['Authorization'] = `Bearer ${token}`;
+                          }
+                          const res = await fetch('/api/bookings', {
+                            method: 'POST',
+                            headers,
+                            body: JSON.stringify(payload)
+                          });
+                          const data = await res.json();
+                          if (res.ok) {
+                            navigate('/confirmation');
+                          } else {
+                            alert(data.message || 'Booking failed');
+                          }
+                        } catch (err) {
+                          console.error(err);
+                          alert('Network error');
+                        } finally {
+                          setIsSubmitting(false);
+                        }
+                      }}
+                      className="bg-red-600 text-white px-10 py-4 rounded-2xl font-bold hover:bg-red-700 flex items-center shadow-xl shadow-red-600/20 transition-all active:scale-95"
+                    >
+                      {isSubmitting ? 'Confirming...' : 'Confirm Booking'} <Lock className="h-5 w-5 ml-2" />
+                    </button>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -458,6 +878,10 @@ const Checkout = () => {
                       alt="Garage" 
                       className="h-20 w-20 rounded-2xl object-cover mr-4 shadow-md"
                       referrerPolicy="no-referrer"
+                      loading="lazy"
+                      width="80"
+                      height="80"
+                      decoding="async"
                     />
                     <div className="absolute -top-2 -right-2 bg-green-500 text-white p-1 rounded-full border-2 border-white">
                       <ShieldCheck className="h-3 w-3" />
@@ -500,18 +924,62 @@ const Checkout = () => {
                       </div>
                     </div>
                   </div>
+
+                  {/* Promo Code Input Block */}
+                  <div className="py-2 border-t border-b border-gray-50/50 my-2">
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        placeholder="Promo Code"
+                        value={promoCode}
+                        onChange={(e) => setPromoCode(e.target.value)}
+                        className="grow bg-gray-50 border border-gray-100 rounded-xl px-3 py-2 text-xs font-semibold outline-none focus:border-red-200 uppercase tracking-wider text-gray-900"
+                      />
+                      <button
+                        type="button"
+                        onClick={applyPromo}
+                        disabled={isApplyingPromo || !promoCode}
+                        className="bg-gray-900 hover:bg-red-600 text-white text-xs font-bold px-4 py-2 rounded-xl transition-all cursor-pointer"
+                      >
+                        {isApplyingPromo ? 'Applying...' : 'Apply'}
+                      </button>
+                    </div>
+                    {promoError && (
+                      <p className="text-[10px] text-red-600 font-bold mt-1.5">{promoError}</p>
+                    )}
+                    {promoResult && (
+                      <p className="text-[10px] text-green-600 font-bold mt-1.5">Code applied successfully!</p>
+                    )}
+                  </div>
+
                   <div className="flex justify-between items-center">
                     <span className="text-sm font-bold text-gray-500">Booking Fee</span>
                     <span className="text-xs font-bold text-green-600 bg-green-50 px-2 py-1 rounded-full uppercase tracking-widest">FREE</span>
                   </div>
+
+                  {promoResult && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm font-bold text-green-600">Promo Discount</span>
+                      <span className="text-sm font-bold text-green-600">- AED {discount}</span>
+                    </div>
+                  )}
+
                   <div className="flex justify-between items-center">
                     <span className="text-sm font-bold text-gray-500">Taxes (5% VAT)</span>
                     <span className="text-sm font-bold text-gray-900">AED {tax.toFixed(2)}</span>
                   </div>
+
                   <div className="flex justify-between items-center pt-6 border-t border-gray-50">
                     <span className="text-xl font-bold text-gray-900">Total</span>
                     <div className="text-right">
-                      <span className="text-2xl font-bold text-red-600">AED {total.toFixed(2)}</span>
+                      {promoResult ? (
+                        <>
+                          <span className="text-sm line-through text-gray-400 mr-2">AED {((servicePrice + (Math.round(servicePrice * 0.05 * 100) / 100))).toFixed(2)}</span>
+                          <span className="text-2xl font-bold text-green-600">AED {total.toFixed(2)}</span>
+                        </>
+                      ) : (
+                        <span className="text-2xl font-bold text-red-600">AED {total.toFixed(2)}</span>
+                      )}
                       {hasSavings && (
                         <p className="text-[10px] text-green-600 font-bold uppercase tracking-widest mt-1">Saved AED {savings.toFixed(2)} vs Market</p>
                       )}

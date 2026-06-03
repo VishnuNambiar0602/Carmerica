@@ -120,16 +120,18 @@ async function fetchDatabaseContext(agentType: AgentType, userId: string, userMe
 
     if (agentType === 'reviews') {
       const reviews = await db.listReviews();
-      const garages = await db.listGarages();
+      const { data: garages } = await db.listGarages();
       const mentionedGarage = garages.find((g) => userMessage.toLowerCase().includes(g.name.toLowerCase()));
       const filtered = mentionedGarage ? reviews.filter((r) => r.garage_id === mentionedGarage.id) : reviews;
       return JSON.stringify(filtered.slice(0, 10), null, 2);
     }
 
     if (agentType === 'maintenance') {
-      const garages = await db.listGarages();
+      const user = await db.findUserById(userId);
+      const { data: garages } = await db.listGarages();
+      const vehicles = user ? await db.listVehicles(user.id) : [];
       return JSON.stringify({
-        registeredVehicles: [{ note: 'Vehicle data from user profile — connect to service history for more detail.' }],
+        registeredVehicles: vehicles,
         garages: garages.slice(0, 10),
       }, null, 2);
     }

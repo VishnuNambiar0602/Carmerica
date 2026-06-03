@@ -79,6 +79,10 @@ const Confirmation = () => {
               alt="Garage" 
               className="h-12 w-12 rounded object-cover mr-4"
               referrerPolicy="no-referrer"
+              loading="lazy"
+              width="48"
+              height="48"
+              decoding="async"
             />
             <div>
               <p className="font-bold text-gray-900">Elite Auto Care</p>

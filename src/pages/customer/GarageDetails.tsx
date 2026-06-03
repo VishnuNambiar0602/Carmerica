@@ -155,24 +155,24 @@ const GarageDetails = () => {
       {/* Gallery */}
       <div className="grid grid-cols-1 md:grid-cols-4 grid-rows-2 gap-3 mb-12 h-[600px]">
         <div className="md:col-span-2 md:row-span-2 relative group cursor-pointer overflow-hidden rounded-[2.5rem]">
-          <img src={garage.images[0]} alt="Garage" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000" referrerPolicy="no-referrer" />
+          <img src={garage.images[0]} alt="Garage" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000" referrerPolicy="no-referrer" width="600" height="600" decoding="async" />
           <div className="absolute inset-0 bg-black/20 group-hover:bg-black/0 transition-colors duration-500" />
         </div>
         <div className="relative group cursor-pointer overflow-hidden rounded-[2rem]">
-          <img src={garage.images[1]} alt="Garage" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000" referrerPolicy="no-referrer" />
+          <img src={garage.images[1]} alt="Garage" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000" referrerPolicy="no-referrer" loading="lazy" width="300" height="300" decoding="async" />
         </div>
         <div className="relative group cursor-pointer overflow-hidden rounded-[2rem]">
-          <img src={garage.images[2]} alt="Garage" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000" referrerPolicy="no-referrer" />
+          <img src={garage.images[2]} alt="Garage" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000" referrerPolicy="no-referrer" loading="lazy" width="300" height="300" decoding="async" />
         </div>
         <div className="relative group cursor-pointer overflow-hidden rounded-[2rem]">
-          <img src={garage.images[3]} alt="Garage" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000" referrerPolicy="no-referrer" />
+          <img src={garage.images[3]} alt="Garage" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000" referrerPolicy="no-referrer" loading="lazy" width="300" height="300" decoding="async" />
         </div>
         <div className="relative group cursor-pointer overflow-hidden rounded-[2rem]">
           <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center text-white z-10">
             <ImageIcon className="h-8 w-8 mb-2" />
             <span className="font-bold text-lg">+12 photos</span>
           </div>
-          <img src={garage.images[0]} alt="Garage" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000" referrerPolicy="no-referrer" />
+          <img src={garage.images[0]} alt="Garage" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000" referrerPolicy="no-referrer" loading="lazy" width="300" height="300" decoding="async" />
         </div>
       </div>
 
@@ -473,7 +473,7 @@ const GarageDetails = () => {
               {[1, 2].map((i) => (
                 <div key={i} className="flex items-center space-x-4 group cursor-pointer">
                   <div className="h-16 w-16 rounded-2xl overflow-hidden shrink-0 border border-gray-200">
-                    <img src={`https://picsum.photos/seed/rec${i}/100/100`} alt="Garage" className="w-full h-full object-cover group-hover:scale-110 transition-transform" referrerPolicy="no-referrer" />
+                    <img src={`https://picsum.photos/seed/rec${i}/100/100`} alt="Garage" className="w-full h-full object-cover group-hover:scale-110 transition-transform" referrerPolicy="no-referrer" loading="lazy" width="64" height="64" decoding="async" />
                   </div>
                   <div>
                     <h5 className="font-bold text-gray-900 text-sm group-hover:text-red-600 transition-colors">Precision Motors {i}</h5>

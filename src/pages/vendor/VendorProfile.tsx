@@ -4,6 +4,60 @@ import { cn } from '../../lib/utils';
 
 const VendorProfile = () => {
   const [activeTab, setActiveTab] = React.useState('general');
+  const [documents, setDocuments] = React.useState<any[]>([]);
+  const [uploading, setUploading] = React.useState(false);
+  const [docType, setDocType] = React.useState('trade-license');
+  const [selectedFile, setSelectedFile] = React.useState<File | null>(null);
+
+  const fetchDocs = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch('/api/vendor/kyv', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        setDocuments(await res.json());
+      }
+    } catch (err) {
+      console.error('Failed to fetch documents:', err);
+    }
+  };
+
+  React.useEffect(() => {
+    fetchDocs();
+  }, []);
+
+  const handleUpload = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedFile) return;
+    setUploading(true);
+    const formData = new FormData();
+    formData.append('document', selectedFile);
+    formData.append('documentType', docType);
+
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch('/api/kyv/upload', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: formData
+      });
+      if (res.ok) {
+        setSelectedFile(null);
+        fetchDocs();
+      } else {
+        const data = await res.json();
+        alert(data.message || 'Upload failed');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Upload error');
+    } finally {
+      setUploading(false);
+    }
+  };
 
   const tabs = [
     { id: 'general', name: 'General Info', icon: Building2 },
@@ -31,7 +85,7 @@ const VendorProfile = () => {
           <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
             <div className="p-6 border-b border-gray-100 text-center">
               <div className="relative inline-block mb-4">
-                <img src="https://picsum.photos/seed/garage1/200/200" alt="Garage Logo" className="h-24 w-24 rounded-xl object-cover border-2 border-gray-100" />
+                <img src="https://picsum.photos/seed/garage1/200/200" alt="Garage Logo" className="h-24 w-24 rounded-xl object-cover border-2 border-gray-100" loading="lazy" width="96" height="96" decoding="async" />
                 <button className="absolute -bottom-2 -right-2 bg-white p-2 rounded-full shadow-md border border-gray-100 hover:bg-gray-50">
                   <Camera className="h-4 w-4 text-[#003580]" />
                 </button>
@@ -107,66 +161,86 @@ const VendorProfile = () => {
                   <h2 className="font-bold text-gray-900">KYV (Know Your Vendor) Verification</h2>
                   <p className="text-sm text-gray-500">Complete your verification to unlock premium platform features and build customer trust.</p>
                 </div>
-                <div className="p-6">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                    <div className="bg-green-50 p-4 rounded-xl border border-green-100 flex items-center gap-4">
-                      <div className="bg-green-100 p-2 rounded-lg">
-                        <CheckCircle2 className="h-5 w-5 text-green-600" />
+                <div className="p-6 space-y-8">
+                  {/* Upload Form */}
+                  <div className="bg-gray-50 p-6 rounded-2xl border border-gray-100 space-y-4">
+                    <h3 className="text-sm font-bold text-gray-900">Upload Verification Document</h3>
+                    <div className="flex flex-col sm:flex-row gap-4 items-end">
+                      <div className="space-y-1 grow">
+                        <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Document Type</label>
+                        <select
+                          value={docType}
+                          onChange={(e) => setDocType(e.target.value)}
+                          className="w-full p-3 bg-white border border-gray-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-[#003580] outline-none"
+                        >
+                          <option value="trade-license">Trade License / Operating Permit</option>
+                          <option value="business-registration">Business Registration Certificate</option>
+                          <option value="tax-registration">VAT / Tax Registration Document</option>
+                          <option value="insurance-policy">Garage Insurance Policy</option>
+                        </select>
                       </div>
-                      <div>
-                        <p className="text-xs font-bold text-green-900 uppercase">Identity</p>
-                        <p className="text-sm font-black text-green-700">Verified</p>
+                      <div className="space-y-1 grow">
+                        <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Choose File</label>
+                        <input
+                          type="file"
+                          accept=".pdf,.png,.jpg,.jpeg"
+                          onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
+                          className="w-full p-2 bg-white border border-gray-200 rounded-xl text-sm file:mr-4 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-blue-50 file:text-[#003580] hover:file:bg-blue-100"
+                        />
                       </div>
-                    </div>
-                    <div className="bg-green-50 p-4 rounded-xl border border-green-100 flex items-center gap-4">
-                      <div className="bg-green-100 p-2 rounded-lg">
-                        <CheckCircle2 className="h-5 w-5 text-green-600" />
-                      </div>
-                      <div>
-                        <p className="text-xs font-bold text-green-900 uppercase">Business License</p>
-                        <p className="text-sm font-black text-green-700">Verified</p>
-                      </div>
-                    </div>
-                    <div className="bg-yellow-50 p-4 rounded-xl border border-yellow-100 flex items-center gap-4">
-                      <div className="bg-yellow-100 p-2 rounded-lg">
-                        <Clock className="h-5 w-5 text-yellow-600" />
-                      </div>
-                      <div>
-                        <p className="text-xs font-bold text-yellow-900 uppercase">Tax Registration</p>
-                        <p className="text-sm font-black text-yellow-700">Pending Review</p>
-                      </div>
+                      <button
+                        onClick={handleUpload}
+                        disabled={uploading || !selectedFile}
+                        className="bg-[#003580] hover:bg-[#00224f] text-white px-6 py-3 rounded-xl text-sm font-bold disabled:opacity-50 transition-all cursor-pointer whitespace-nowrap"
+                      >
+                        {uploading ? 'Uploading...' : 'Upload'}
+                      </button>
                     </div>
                   </div>
 
+                  {/* Document List */}
                   <div className="space-y-4">
-                    <h3 className="text-sm font-bold text-gray-900">Required Documents</h3>
-                    <div className="grid grid-cols-1 gap-3">
-                      {[
-                        { name: 'Business Registration Certificate', status: 'verified', date: 'Oct 10, 2025' },
-                        { name: 'Trade License / Operating Permit', status: 'verified', date: 'Oct 10, 2025' },
-                        { name: 'VAT / Tax Registration Document', status: 'pending', date: 'Oct 12, 2025' },
-                        { name: 'Garage Insurance Policy', status: 'verified', date: 'Oct 11, 2025' },
-                      ].map((doc, idx) => (
-                        <div key={idx} className="flex items-center justify-between p-4 border border-gray-100 rounded-xl hover:bg-gray-50 transition-all">
-                          <div className="flex items-center gap-3">
-                            <FileText className="h-5 w-5 text-gray-400" />
-                            <div>
-                              <p className="text-sm font-bold text-gray-900">{doc.name}</p>
-                              <p className="text-[10px] text-gray-500">Uploaded on {doc.date}</p>
+                    <h3 className="text-sm font-bold text-gray-900">Your Verification Documents</h3>
+                    {documents.length === 0 ? (
+                      <p className="text-sm text-gray-400 py-6 text-center italic border border-dashed rounded-2xl">No documents uploaded yet.</p>
+                    ) : (
+                      <div className="grid grid-cols-1 gap-3">
+                        {documents.map((doc) => (
+                          <div key={doc.id} className="flex items-center justify-between p-4 border border-gray-100 rounded-xl hover:bg-gray-50 transition-all">
+                            <div className="flex items-center gap-3">
+                              <FileText className="h-5 w-5 text-gray-400 shrink-0" />
+                              <div>
+                                <p className="text-sm font-bold text-gray-900 capitalize">{doc.document_type.replace('-', ' ')}</p>
+                                <p className="text-[10px] text-gray-500">{doc.file_name} • Uploaded {new Date(doc.created_at).toLocaleDateString()}</p>
+                                {doc.review_note && (
+                                  <p className="text-xs text-red-600 font-bold mt-1 bg-red-50 px-2 py-0.5 rounded">Note: {doc.review_note}</p>
+                                )}
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <span className={cn(
+                                "text-[10px] font-bold px-2 py-1 rounded-full uppercase tracking-widest",
+                                doc.status === 'approved' ? "bg-green-100 text-green-700" :
+                                doc.status === 'rejected' ? "bg-red-100 text-red-700" :
+                                "bg-yellow-100 text-yellow-700"
+                              )}>
+                                {doc.status}
+                              </span>
+                              {doc.file_url && (
+                                <a 
+                                  href={doc.file_url} 
+                                  target="_blank" 
+                                  rel="noreferrer" 
+                                  className="text-xs font-bold text-[#003580] hover:underline"
+                                >
+                                  View
+                                </a>
+                              )}
                             </div>
                           </div>
-                          <div className="flex items-center gap-3">
-                            <span className={cn(
-                              "text-[10px] font-bold px-2 py-1 rounded-full uppercase tracking-widest",
-                              doc.status === 'verified' ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"
-                            )}>
-                              {doc.status}
-                            </span>
-                            <button className="text-xs font-bold text-[#003580] hover:underline">View</button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

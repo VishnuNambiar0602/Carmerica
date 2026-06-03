@@ -18,7 +18,16 @@ interface ChatWidgetState {
   userLocation: UserLocation | null;
 }
 
-const USER_ID = 'user-1';
+const getUserId = (): string => {
+  const token = localStorage.getItem('token');
+  if (!token) return 'user-1';
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    return payload.sub || payload.id || 'user-1';
+  } catch {
+    return 'user-1';
+  }
+};
 
 const AGENT_NAMES: Record<AgentType, string> = {
   team_lead: 'Jordan (Team Lead)',
@@ -112,7 +121,7 @@ export default function ChatWidget() {
         userMessage: '',
         conversationHistory: [],
         currentAgent: null,
-        userId: USER_ID,
+        userId: getUserId(),
       });
       processResponse(response);
     } catch (err) {
@@ -132,7 +141,7 @@ export default function ChatWidget() {
         userMessage: 'Hello, I was just connected to you. Please introduce yourself and check if I have any specific needs based on our history.',
         conversationHistory: currentHistory,
         currentAgent: agentType,
-        userId: USER_ID,
+        userId: getUserId(),
       });
       processResponse(response);
     } catch (err) {
@@ -236,7 +245,7 @@ export default function ChatWidget() {
             userMessage: text,
             conversationHistory: [...historyBeforeUpdate, userMessage],
             currentAgent: state.activeAgent,
-            userId: USER_ID,
+            userId: getUserId(),
           });
           processResponse(response);
         }

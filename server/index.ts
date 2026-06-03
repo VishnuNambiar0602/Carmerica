@@ -1,5 +1,6 @@
 import express from 'express';
 import cors from 'cors';
+import cookieParser from 'cookie-parser';
 import dotenv from 'dotenv';
 import helmet from 'helmet';
 import compression from 'compression';
@@ -48,6 +49,7 @@ app.use(helmet({
 
 app.use(compression());
 app.use(cors({ origin: allowedOrigins, credentials: true }));
+app.use(cookieParser());
 app.use(csrfProtection);
 
 // --- Rate limiting ---
@@ -66,6 +68,14 @@ const authLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   message: { message: 'Too many auth attempts, please try again later.' },
+});
+
+const resetLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 5, // max 5 reset requests per IP per hour
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: 'Too many password reset requests. Try again in an hour.' },
 });
 
 // Stripe webhook raw parsing MUST be registered BEFORE general json parsing!
@@ -93,6 +103,8 @@ app.get('/health', async (_req, res) => {
 });
 
 // --- Routes (with auth rate limiting) ---
+app.use('/api/auth/forgot-password', resetLimiter);
+app.use('/api/auth/reset-password', resetLimiter);
 app.use('/api/auth', authLimiter);
 app.use('/api/admin/login', authLimiter);
 app.use('/api', apiRoutes);

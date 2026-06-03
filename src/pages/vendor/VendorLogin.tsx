@@ -7,10 +7,20 @@ const VendorLogin = () => {
   const [showPassword, setShowPassword] = React.useState(false);
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState('');
+  const [successMessage, setSuccessMessage] = React.useState('');
   const [formData, setFormData] = React.useState({
     email: '',
     password: ''
   });
+
+  React.useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('verified') === '1') {
+      setSuccessMessage('Your email has been successfully verified! You can now sign in.');
+    } else if (params.get('verify_needed') === '1') {
+      setSuccessMessage('Verification email sent! Please check your inbox and verify your email before signing in.');
+    }
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -101,6 +111,12 @@ const VendorLogin = () => {
           {error && (
             <div className="bg-red-50 border border-red-200 text-red-700 text-sm p-4 rounded-lg">
               {error}
+            </div>
+          )}
+
+          {successMessage && (
+            <div className="bg-green-50 border border-green-200 text-green-800 text-sm p-4 rounded-lg animate-pulse">
+              {successMessage}
             </div>
           )}
 

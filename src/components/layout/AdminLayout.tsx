@@ -21,6 +21,7 @@ import {
   Bell
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { NotificationBell } from '../NotificationBell';
 
 const Sidebar = ({ isOpen, setIsOpen }: { isOpen: boolean; setIsOpen: (val: boolean) => void }) => {
   const location = useLocation();
@@ -129,6 +130,17 @@ const Header = ({ setIsOpen }: { setIsOpen: (val: boolean) => void }) => {
     return !!token;
   };
 
+  const getUser = () => {
+    if (typeof window === 'undefined') return null;
+    const userStr = localStorage.getItem('user');
+    try {
+      return userStr ? JSON.parse(userStr) : null;
+    } catch {
+      return null;
+    }
+  };
+  const user = getUser();
+
   return (
     <header className="bg-white border-b border-gray-200 h-16 sticky top-0 z-30 flex items-center justify-between px-4 md:px-8">
       <div className="flex items-center">
@@ -148,10 +160,9 @@ const Header = ({ setIsOpen }: { setIsOpen: (val: boolean) => void }) => {
       </div>
 
       <div className="flex items-center space-x-4">
-        <button className="p-2 text-gray-500 hover:bg-gray-100 rounded-full relative">
-          <Bell className="h-6 w-6" />
-          <span className="absolute top-2 right-2 h-2 w-2 bg-red-500 rounded-full border-2 border-white"></span>
-        </button>
+        {isAuthenticated() && (
+          <NotificationBell userId={user?.id || 'admin-1'} role="admin" />
+        )}
         {isAuthenticated() ? (
           <div className="flex items-center space-x-3 border-l pl-4 border-gray-200">
             <div className="text-right hidden sm:block">

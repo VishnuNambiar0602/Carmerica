@@ -15,7 +15,9 @@ import GarageDetails from './pages/customer/GarageDetails';
 import Checkout from './pages/customer/Checkout';
 import Confirmation from './pages/customer/Confirmation';
 import MyBookings from './pages/customer/MyBookings';
+import Support from './pages/customer/Support';
 import Login from './pages/customer/Login';
+import Profile from './pages/customer/Profile';
 import VendorDashboard from './pages/vendor/VendorDashboard';
 import VendorBookings from './pages/vendor/VendorBookings';
 import VendorLogin from './pages/vendor/VendorLogin';
@@ -75,18 +77,7 @@ const PackageDetails = () => (
   </div>
 );
 
-const Profile = () => (
-  <div className="max-w-6xl mx-auto px-4 py-12 grid grid-cols-1 lg:grid-cols-3 gap-8">
-    <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-6">
-      <h1 className="text-2xl font-bold text-gray-900 mb-2">User Account</h1>
-      <p className="text-gray-600 text-sm">Manage your bookings, saved garages, and contact details.</p>
-    </div>
-    <div className="lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-6">
-      <SectionCard title="My bookings" body="Review upcoming and past visits, download invoices, and rebook services quickly." cta="Open bookings" to="/my-bookings" />
-      <SectionCard title="Saved garages" body="Keep track of trusted garages and return to your preferred service centers faster." cta="Search garages" to="/search" />
-    </div>
-  </div>
-);
+
 
 const Offers = () => (
   <div className="max-w-7xl mx-auto px-4 py-12 space-y-8">
@@ -102,18 +93,7 @@ const Offers = () => (
   </div>
 );
 
-const Support = () => (
-  <div className="max-w-6xl mx-auto px-4 py-12 space-y-8">
-    <div>
-      <h1 className="text-3xl font-bold text-gray-900">Support Center</h1>
-      <p className="text-gray-600 mt-2">Find help for bookings, cancellations, vendor issues, and account access.</p>
-    </div>
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-      <SectionCard title="Booking help" body="Need to reschedule or cancel? Review your confirmation email or open your bookings page." cta="My bookings" to="/my-bookings" />
-      <SectionCard title="Contact support" body="Reach the team for account, payment, and garage support questions." cta="Contact us" to="/contact" />
-    </div>
-  </div>
-);
+
 
 const About = () => (
   <div className="max-w-6xl mx-auto px-4 py-12 space-y-8">
@@ -176,7 +156,7 @@ function App() {
           <Route path="login" element={<Login />} />
           <Route path="forgot-password" element={<ForgotPassword />} />
           <Route path="offers" element={<Offers />} />
-          <Route path="support" element={<Support />} />
+          <Route path="support" element={<ProtectedRoute><Support /></ProtectedRoute>} />
           <Route path="about" element={<About />} />
           <Route path="contact" element={<Contact />} />
           <Route path="blog" element={<Blog />} />

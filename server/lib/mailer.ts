@@ -69,3 +69,16 @@ export async function sendPasswordResetEmail(to: string, token: string) {
     html: `<p>Reset your CarMerica password using this secure link:</p><p><a href="${resetUrl}">Reset password</a></p>`,
   });
 }
+
+export async function sendVerificationEmail(to: string, token: string) {
+  const baseUrl = process.env.APP_URL || 'http://localhost:3000';
+  const verifyUrl = `${baseUrl.replace(/\/$/, '')}/api/auth/verify-email?token=${encodeURIComponent(token)}`;
+
+  await sendMail({
+    to,
+    subject: 'Verify your CarMerica account',
+    text: `Please verify your email address by clicking this link: ${verifyUrl}`,
+    html: `<p>Please verify your email address by clicking this link:</p><p><a href="${verifyUrl}">Verify Email</a></p>`,
+  });
+}
+

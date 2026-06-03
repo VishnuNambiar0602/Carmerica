@@ -43,6 +43,7 @@ const VendorDashboard = () => {
   const [aiInsight, setAiInsight] = useState<any>(null);
   const [isOptimizing, setIsOptimizing] = useState(false);
   const [hasGarage, setHasGarage] = useState<boolean>(true);
+  const [period, setPeriod] = useState<'week' | 'month' | 'year' | 'all'>('month');
 
   const fetchAiInsight = async () => {
     setIsOptimizing(true);
@@ -72,36 +73,37 @@ const VendorDashboard = () => {
     }
   };
 
+  const loadStats = async (selPeriod: string) => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) return;
+      const authRes = await fetch('/api/auth/me', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (!authRes.ok) return;
+      const meData = await authRes.json();
+      const vendorId = meData.vendor?.id || meData.vendorId || 'vendor-1';
+      const res = await fetch(`/api/vendor/stats?vendorId=${encodeURIComponent(vendorId)}&period=${selPeriod}`);
+      const data = await res.json();
+      setStatsData(data);
+      if (data) {
+        setRecentBookingsData(data.recentBookings || []);
+      }
+
+      // Fetch garages for this vendor to verify setup status
+      const garageRes = await fetch(`/api/garages?vendorId=${encodeURIComponent(vendorId)}`);
+      if (garageRes.ok) {
+        const garages = await garageRes.json();
+        setHasGarage(garages.length > 0);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   useEffect(() => {
     fetchAiInsight();
-    const load = async () => {
-      try {
-        const token = localStorage.getItem('token');
-        if (!token) return;
-        const authRes = await fetch('/api/auth/me', {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        if (!authRes.ok) return;
-        const meData = await authRes.json();
-        const vendorId = meData.vendor?.id || meData.vendorId || 'vendor-1';
-        const res = await fetch(`/api/vendor/stats?vendorId=${encodeURIComponent(vendorId)}`);
-        const data = await res.json();
-        setStatsData(data);
-        if (data) {
-          setRecentBookingsData(data.recentBookings || []);
-        }
-
-        // Fetch garages for this vendor to verify setup status
-        const garageRes = await fetch(`/api/garages?vendorId=${encodeURIComponent(vendorId)}`);
-        if (garageRes.ok) {
-          const garages = await garageRes.json();
-          setHasGarage(garages.length > 0);
-        }
-      } catch (err) {
-        console.error(err);
-      }
-    };
-    load();
+    loadStats(period);
   }, []);
 
   const defaultRecentBookings = [
@@ -182,11 +184,25 @@ const VendorDashboard = () => {
           <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Good morning, Elite Motors!</h1>
           <p className="text-gray-500 mt-1">Your AI assistant has prepared your daily performance report.</p>
         </div>
-        <div className="flex gap-3">
-          <button onClick={() => navigate('/vendor/calendar')} className="bg-white border border-gray-100 text-gray-700 px-6 py-3 rounded-2xl text-sm font-bold hover:bg-gray-50 flex items-center shadow-sm transition-all">
+        <div className="flex flex-wrap gap-3 items-center">
+          <select
+            value={period}
+            onChange={(e) => {
+              const p = e.target.value as any;
+              setPeriod(p);
+              loadStats(p);
+            }}
+            className="bg-white border border-gray-100 text-gray-700 px-4 py-3 rounded-2xl text-sm font-bold shadow-sm outline-none focus:border-red-200 cursor-pointer"
+          >
+            <option value="week">This Week</option>
+            <option value="month">This Month</option>
+            <option value="year">This Year</option>
+            <option value="all">All Time</option>
+          </select>
+          <button onClick={() => navigate('/vendor/calendar')} className="bg-white border border-gray-100 text-gray-700 px-6 py-3 rounded-2xl text-sm font-bold hover:bg-gray-50 flex items-center shadow-sm transition-all cursor-pointer">
             <Calendar className="h-4 w-4 mr-2" /> View Calendar
           </button>
-          <button onClick={() => navigate('/vendor/bookings')} className="bg-gray-900 text-white px-6 py-3 rounded-2xl text-sm font-bold hover:bg-red-600 flex items-center shadow-xl shadow-gray-900/10 transition-all">
+          <button onClick={() => navigate('/vendor/bookings')} className="bg-gray-900 text-white px-6 py-3 rounded-2xl text-sm font-bold hover:bg-red-600 flex items-center shadow-xl shadow-gray-900/10 transition-all cursor-pointer">
             <Wrench className="h-4 w-4 mr-2" /> Add New Job
           </button>
         </div>
@@ -202,6 +218,9 @@ const VendorDashboard = () => {
             statsData.pending,
           ] : null;
           const override = values ? values[idx] : stat.value;
+          const displayName = stat.name === 'Revenue' 
+            ? `Revenue (${period === 'week' ? 'this week' : period === 'month' ? 'this month' : period === 'year' ? 'this year' : 'all time'})`
+            : stat.name;
           return (
             <div key={stat.name} className="bg-white p-8 rounded-4xl border border-gray-100 shadow-sm hover:shadow-xl transition-all group">
               <div className="flex items-center justify-between mb-6">
@@ -214,7 +233,7 @@ const VendorDashboard = () => {
                   </span>
                 </div>
               </div>
-              <h3 className="text-gray-400 text-xs font-bold uppercase tracking-widest">{stat.name}</h3>
+              <h3 className="text-gray-400 text-xs font-bold uppercase tracking-widest">{displayName}</h3>
               <p className="text-3xl font-bold text-gray-900 mt-2">{override}</p>
             </div>
           );

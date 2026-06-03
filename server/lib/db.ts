@@ -12,6 +12,7 @@ export interface UserRecord {
   full_name: string;
   phone?: string;
   status: 'active' | 'disabled';
+  email_verified_at?: string;
   metadata?: Record<string, unknown>;
   created_at: string;
   updated_at: string;
@@ -162,6 +163,11 @@ export interface PromotionRecord {
   description?: string;
   discount_type?: string;
   discount_value?: number;
+  promo_code?: string;
+  usage_limit?: number;
+  used_count?: number;
+  starts_at?: string;
+  ends_at?: string;
   status: string;
   metadata?: Record<string, unknown>;
   created_at: string;
@@ -297,15 +303,17 @@ class InMemoryStore {
     refund_policy_hours: 24,
   };
   resetTokens: Array<{ token: string; email: string; role: string; expiresAt: number }> = [];
+  verificationTokens: Array<{ token: string; email: string; expiresAt: number }> = [];
+
 
   async seedInitialData() {
     const hash = await bcrypt.hash('password123', 10);
     const adminHash = await bcrypt.hash('admin123', 10);
 
     this.users.push(
-      { id: 'user-1', email: 'john@example.com', password_hash: hash, role: 'customer', full_name: 'John Doe', phone: '+1-555-0101', status: 'active', created_at: now(), updated_at: now() },
-      { id: 'user-2', email: 'partner@garage.com', password_hash: hash, role: 'vendor', full_name: 'Elite Motors Admin', phone: '+1-555-0102', status: 'active', created_at: now(), updated_at: now() },
-      { id: 'user-admin', email: 'admin@carmerica.com', password_hash: adminHash, role: 'admin', full_name: 'System Admin', status: 'active', created_at: now(), updated_at: now() },
+      { id: 'user-1', email: 'john@example.com', password_hash: hash, role: 'customer', full_name: 'John Doe', phone: '+1-555-0101', status: 'active', email_verified_at: now(), created_at: now(), updated_at: now() },
+      { id: 'user-2', email: 'partner@garage.com', password_hash: hash, role: 'vendor', full_name: 'Elite Motors Admin', phone: '+1-555-0102', status: 'active', email_verified_at: now(), created_at: now(), updated_at: now() },
+      { id: 'user-admin', email: 'admin@carmerica.com', password_hash: adminHash, role: 'admin', full_name: 'System Admin', status: 'active', email_verified_at: now(), created_at: now(), updated_at: now() },
     );
 
     this.vendors.push(
@@ -332,32 +340,38 @@ class InMemoryStore {
     );
 
     this.bookings.push(
-      { id: 'BK-1029', vendor_id: 'vendor-1', garage_id: 'garage-1', service_id: 's2', customer_email: 'john@example.com', customer_name: 'John Doe', vehicle: 'Toyota Camry', scheduled_date: 'Oct 12, 2026', scheduled_time: '10:00 AM', status: 'In Progress', amount: 89, phone: '+1-555-0101', created_at: now(), updated_at: now() },
+      { id: 'BK-1029', vendor_id: 'vendor-1', garage_id: 'garage-1', service_id: 's2', customer_email: 'john@example.com', customer_name: 'John Doe', vehicle: 'Toyota Camry', scheduled_date: 'Oct 12, 2026', scheduled_time: '10:00 AM', status: 'In Progress', amount: 89, phone: '+1-555-0101', customer_id: 'user-1', created_at: now(), updated_at: now() },
       { id: 'BK-1030', vendor_id: 'vendor-1', garage_id: 'garage-1', service_id: 's1', customer_email: 'sarah@example.com', customer_name: 'Sarah Smith', vehicle: 'Honda Civic', scheduled_date: 'Oct 12, 2026', scheduled_time: '11:30 AM', status: 'Pending', amount: 120, phone: '+1-555-0103', created_at: now(), updated_at: now() },
       { id: 'BK-1031', vendor_id: 'vendor-1', garage_id: 'garage-2', service_id: 's3', customer_email: 'mike@example.com', customer_name: 'Mike Johnson', vehicle: 'Ford F-150', scheduled_date: 'Oct 12, 2026', scheduled_time: '01:00 PM', status: 'Confirmed', amount: 189, phone: '+1-555-0104', created_at: now(), updated_at: now() },
       { id: 'BK-1028', vendor_id: 'vendor-1', garage_id: 'garage-1', service_id: 's3', customer_email: 'robert@example.com', customer_name: 'Robert Brown', vehicle: 'BMW 3 Series', scheduled_date: 'Oct 11, 2026', scheduled_time: '09:00 AM', status: 'Completed', amount: 250, phone: '+1-555-0105', created_at: now(), updated_at: now() },
+      { id: 'BK-1032', vendor_id: 'vendor-1', garage_id: 'garage-1', service_id: 's2', customer_email: 'john@example.com', customer_name: 'John Doe', vehicle: 'Toyota Camry', scheduled_date: 'Jun 15, 2026', scheduled_time: '02:00 PM', status: 'Confirmed', amount: 49, phone: '+1-555-0101', customer_id: 'user-1', created_at: now(), updated_at: now() },
+      { id: 'BK-1033', vendor_id: 'vendor-1', garage_id: 'garage-2', service_id: 's4', customer_email: 'john@example.com', customer_name: 'John Doe', vehicle: 'Toyota Camry', scheduled_date: 'May 20, 2026', scheduled_time: '09:30 AM', status: 'Completed', amount: 150, phone: '+1-555-0101', customer_id: 'user-1', created_at: now(), updated_at: now() },
     );
 
     this.reviews.push(
-      { id: 'rev-1', garage_id: 'garage-1', rating: 5, comment: 'Excellent service!', user_name: 'John Doe', vendor_name: 'Elite Auto Care', status: 'published', created_at: now(), updated_at: now() },
-      { id: 'rev-2', garage_id: 'garage-2', rating: 4, comment: 'Good experience overall.', user_name: 'Sarah Smith', vendor_name: 'Precision Mechanics', status: 'published', created_at: now(), updated_at: now() },
-      { id: 'rev-3', garage_id: 'garage-1', rating: 2, comment: 'The service took longer than expected.', user_name: 'Mike Johnson', vendor_name: 'Elite Auto Care', status: 'flagged', created_at: now(), updated_at: now() },
+      { id: 'rev-1', garage_id: 'garage-1', rating: 5, comment: 'Excellent service! They finished the oil change in under 30 minutes. Staff was extremely polite.', user_name: 'John Doe', vendor_name: 'Elite Auto Care', status: 'published', created_at: now(), updated_at: now() },
+      { id: 'rev-2', garage_id: 'garage-2', rating: 4, comment: 'Good experience overall. General service was thoroughly done, although the queue was a bit long.', user_name: 'Sarah Smith', vendor_name: 'Precision Mechanics', status: 'published', created_at: now(), updated_at: now() },
+      { id: 'rev-3', garage_id: 'garage-1', rating: 2, comment: 'The brake service took twice as long as quoted and price was slightly higher. Disappointed.', user_name: 'Mike Johnson', vendor_name: 'Elite Auto Care', status: 'published', created_at: now(), updated_at: now() },
     );
 
     this.payments.push(
       { id: 'pay-1', booking_id: 'BK-1028', amount: 250, currency: 'AED', status: 'paid', refund_amount: 0, created_at: now(), updated_at: now() },
+      { id: 'pay-2', booking_id: 'BK-1033', amount: 150, currency: 'AED', status: 'paid', refund_amount: 0, created_at: now(), updated_at: now() },
     );
 
     this.promotions.push(
-      { id: 'promo-1', vendor_id: 'vendor-1', title: 'AC Summer Deal', description: '10% off AC diagnostics', discount_type: 'percent', discount_value: 10, status: 'active', created_at: now(), updated_at: now() },
+      { id: 'promo-1', vendor_id: 'vendor-1', title: 'AC Summer Deal', description: '10% off AC diagnostics', discount_type: 'percent', discount_value: 10, promo_code: 'SUMMER10', usage_limit: 100, used_count: 5, status: 'active', created_at: now(), updated_at: now() },
+      { id: 'promo-2', vendor_id: 'vendor-1', title: 'Winter Shield Offer', description: 'AED 30 discount on brake repair services', discount_type: 'value', discount_value: 30, promo_code: 'WINTER30', usage_limit: 50, used_count: 2, status: 'active', created_at: now(), updated_at: now() },
     );
 
     this.staff.push(
       { id: 'staff-1', vendor_id: 'vendor-1', name: 'Alex Turner', role: 'Service Advisor', email: 'alex@elite.example', phone: '+1-555-0201', active: true, created_at: now(), updated_at: now() },
+      { id: 'staff-2', vendor_id: 'vendor-1', name: 'Maria Santos', role: 'Diagnostic Specialist', email: 'maria@elite.example', phone: '+1-555-0202', active: true, created_at: now(), updated_at: now() },
     );
 
     this.wishlist.push(
       { id: 'wish-1', customer_email: 'john@example.com', garage_id: 'garage-1', created_at: now() },
+      { id: 'wish-2', customer_email: 'john@example.com', garage_id: 'garage-2', created_at: now() },
     );
 
     this.vehicles.push(
@@ -374,6 +388,34 @@ class InMemoryStore {
         status: 'active',
         created_at: now(),
         updated_at: now()
+      },
+      {
+        id: 'veh-2',
+        user_id: 'user-1',
+        make: 'Tesla',
+        model: 'Model 3',
+        year: 2023,
+        vin: '5YJ3E1EA5NF111111',
+        mileage: 18200,
+        color: 'Midnight Silver',
+        fuel_type: 'Electric',
+        status: 'active',
+        created_at: now(),
+        updated_at: now()
+      },
+      {
+        id: 'veh-3',
+        user_id: 'user-1',
+        make: 'Ford',
+        model: 'Mustang',
+        year: 2020,
+        vin: '1FA6P8CF8LF111111',
+        mileage: 56000,
+        color: 'Shadow Black',
+        fuel_type: 'Petrol',
+        status: 'active',
+        created_at: now(),
+        updated_at: now()
       }
     );
 
@@ -383,6 +425,9 @@ class InMemoryStore {
 
     this.supportTickets.push(
       { id: 'ticket-1', subject: 'Sample ticket', message: 'Customer needs help with a booking.', status: 'open', priority: 'medium', created_at: now(), updated_at: now() },
+      { id: 'ticket-2', subject: 'Double payment charge on checkout', message: 'Hi support team, I noticed a duplicate transaction on my credit card when booking an Oil Change today. Please refund one of them.', status: 'open', priority: 'high', created_at: now(), updated_at: now() },
+      { id: 'ticket-3', subject: 'Vendor didn\'t confirm my rescheduled date', message: 'I submitted a rescheduling request for booking BK-1032, but it has been pending for over 24 hours. Can you nudge the garage?', status: 'open', priority: 'medium', created_at: now(), updated_at: now() },
+      { id: 'ticket-4', subject: 'Smart diagnostics engine accuracy', message: 'I analyzed a photo of my front brake pad and the AI diagnosed it as worn out. But a physical checkup says it is 50% healthy. I want to report this feedback.', status: 'resolved', priority: 'low', created_at: now(), updated_at: now() },
     );
 
     this.cmsPages.push(
@@ -415,6 +460,25 @@ function ensureMemorySeeded() {
     store.seedInitialData();
     memorySeeded = true;
   }
+}
+
+export interface GarageFilter {
+  query?: string;
+  vendorId?: string;
+  minRating?: number;
+  city?: string;
+  limit?: number;
+  offset?: number;
+}
+
+export interface ServiceFilter {
+  query?: string;
+  vendorId?: string;
+  garageId?: string;
+  categoryId?: string;
+  minPrice?: number;
+  maxPrice?: number;
+  active?: boolean;
 }
 
 class Database {
@@ -644,27 +708,38 @@ class Database {
     return store.garages.find((g) => g.id === id) || null;
   }
 
-  async listGarages(filter?: { query?: string; vendorId?: string }): Promise<GarageRecord[]> {
+  async listGarages(filter?: GarageFilter): Promise<{ data: GarageRecord[]; total: number }> {
     if (this.isSupabase && this.client) {
       try {
-        let query = this.client.from('garages').select('*');
+        let query = this.client.from('garages').select('*', { count: 'exact' });
         if (filter?.vendorId) query = query.eq('vendor_id', filter.vendorId);
+        if (filter?.minRating) query = query.gte('rating', filter.minRating);
+        if (filter?.city) query = query.eq('city', filter.city);
         if (filter?.query) query = query.or(`name.ilike.%${filter.query}%,location.ilike.%${filter.query}%,city.ilike.%${filter.query}%`);
-        const { data } = await query.order('created_at', { ascending: false });
-        if (data) return data as GarageRecord[];
+        query = query.order('created_at', { ascending: false });
+        if (filter?.limit !== undefined && filter?.offset !== undefined) {
+          query = query.range(filter.offset, filter.offset + filter.limit - 1);
+        }
+        const { data, count } = await query;
+        if (data) return { data: data as GarageRecord[], total: count || data.length };
       } catch (err) {
         if (process.env.NODE_ENV === 'production') throw err;
         console.warn('[DB] Supabase error, falling back to memory:', err);
-        // Fall through to in-memory
       }
     }
     let result = store.garages.filter((g) => g.active !== false);
     if (filter?.vendorId) result = result.filter((g) => g.vendor_id === filter.vendorId);
+    if (filter?.minRating) result = result.filter((g) => g.rating >= filter.minRating);
+    if (filter?.city) result = result.filter((g) => g.city === filter.city);
     if (filter?.query) {
       const q = filter.query.toLowerCase();
       result = result.filter((g) => [g.name, g.location, g.city, g.description].filter(Boolean).join(' ').toLowerCase().includes(q));
     }
-    return result;
+    const total = result.length;
+    if (filter?.limit !== undefined && filter?.offset !== undefined) {
+      result = result.slice(filter.offset, filter.offset + filter.limit);
+    }
+    return { data: result, total };
   }
 
   async createGarage(garage: GarageRecord): Promise<GarageRecord> {
@@ -808,24 +883,31 @@ class Database {
   }
 
   // --- Services ---
-  async listServices(filter?: { query?: string; vendorId?: string; garageId?: string }): Promise<ServiceRecord[]> {
+  async listServices(filter?: ServiceFilter): Promise<ServiceRecord[]> {
     if (this.isSupabase && this.client) {
       try {
         let query = this.client.from('services').select('*');
         if (filter?.vendorId) query = query.eq('vendor_id', filter.vendorId);
         if (filter?.garageId) query = query.eq('garage_id', filter.garageId);
+        if (filter?.categoryId) query = query.eq('category_id', filter.categoryId);
+        if (filter?.minPrice !== undefined) query = query.gte('price', filter.minPrice);
+        if (filter?.maxPrice !== undefined) query = query.lte('price', filter.maxPrice);
+        if (filter?.active !== undefined) query = query.eq('active', filter.active);
         if (filter?.query) query = query.ilike('name', `%${filter.query}%`);
         const { data } = await query.order('created_at', { ascending: false });
         if (data) return data as ServiceRecord[];
       } catch (err) {
         if (process.env.NODE_ENV === 'production') throw err;
         console.warn('[DB] Supabase error, falling back to memory:', err);
-        // Fall through to in-memory
       }
     }
     let result = store.services.filter((s) => s.active !== false);
     if (filter?.vendorId) result = result.filter((s) => s.vendor_id === filter.vendorId);
     if (filter?.garageId) result = result.filter((s) => s.garage_id === filter.garageId);
+    if (filter?.categoryId) result = result.filter((s) => s.category_id === filter.categoryId);
+    if (filter?.minPrice !== undefined) result = result.filter((s) => s.price >= filter.minPrice);
+    if (filter?.maxPrice !== undefined) result = result.filter((s) => s.price <= filter.maxPrice);
+    if (filter?.active !== undefined) result = result.filter((s) => s.active === filter.active);
     if (filter?.query) {
       const q = filter.query.toLowerCase();
       result = result.filter((s) => [s.name, s.description].filter(Boolean).join(' ').toLowerCase().includes(q));
@@ -1689,6 +1771,18 @@ class Database {
 
   deleteResetToken(token: string) {
     store.resetTokens = store.resetTokens.filter((t) => t.token !== token);
+  }
+
+  addVerificationToken(token: string, email: string) {
+    store.verificationTokens.push({ token, email, expiresAt: Date.now() + 1000 * 60 * 60 * 48 });
+  }
+
+  findVerificationToken(token: string) {
+    return store.verificationTokens.find((t) => t.token === token && t.expiresAt > Date.now()) || null;
+  }
+
+  removeVerificationToken(token: string) {
+    store.verificationTokens = store.verificationTokens.filter((t) => t.token !== token);
   }
 
   getStats() {

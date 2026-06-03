@@ -26,12 +26,95 @@ import {
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
+const StatsCard = ({ stat, loading }: { stat: any; loading: boolean }) => {
+  const [tilt, setTilt] = React.useState({ x: 0, y: 0 });
+
+  if (loading) {
+    return (
+      <div className="bg-white p-8 rounded-[2rem] border border-gray-100 shadow-sm animate-pulse">
+        <div className="flex justify-between items-center mb-6">
+          <div className="h-12 w-12 bg-gray-100 rounded-2xl" />
+          <div className="h-5 w-16 bg-gray-100 rounded-full" />
+        </div>
+        <div className="h-3 w-20 bg-gray-100 rounded mb-2" />
+        <div className="h-8 w-28 bg-gray-100 rounded" />
+      </div>
+    );
+  }
+
+  return (
+    <div 
+      onMouseMove={(e) => {
+        const card = e.currentTarget;
+        const box = card.getBoundingClientRect();
+        const x = e.clientX - box.left - box.width / 2;
+        const y = e.clientY - box.top - box.height / 2;
+        const factorX = 10 / (box.height / 2);
+        const factorY = 10 / (box.width / 2);
+        setTilt({ x: -y * factorX, y: x * factorY });
+      }}
+      onMouseLeave={() => setTilt({ x: 0, y: 0 })}
+      style={{
+        transform: `perspective(1000px) rotateX(${tilt.x}deg) rotateY(${tilt.y}deg)`,
+        transition: 'transform 0.15s ease-out',
+        transformStyle: 'preserve-3d',
+      }}
+      className="bg-white p-8 rounded-[2rem] border border-gray-100 shadow-sm hover:shadow-xl transition-all group"
+    >
+      <div className="flex items-center justify-between mb-6">
+        <div className={cn("p-4 rounded-2xl transition-colors", stat.bg)}>
+          <stat.icon className={cn("h-6 w-6", stat.color)} />
+        </div>
+        <div className="flex flex-col items-end">
+          <span className={cn(
+            "text-[10px] font-bold px-2 py-1 rounded-full flex items-center uppercase tracking-widest",
+            stat.trend.startsWith('-') ? "bg-red-50 text-red-600" : "bg-green-50 text-green-600"
+          )}>
+            {stat.trend.startsWith('-') ? <ArrowDownRight className="h-3 w-3 mr-1" /> : <ArrowUpRight className="h-3 w-3 mr-1" />}
+            {stat.trend}
+          </span>
+        </div>
+      </div>
+      <h3 className="text-gray-400 text-xs font-bold uppercase tracking-widest">{stat.name}</h3>
+      <p className="text-3xl font-bold text-gray-900 mt-2">{stat.value}</p>
+    </div>
+  );
+};
+
 const AdminOverview = () => {
+  const [statsData, setStatsData] = React.useState<any>(null);
+  const [loading, setLoading] = React.useState(true);
+
+  const fetchStats = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch('/api/admin/stats', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setStatsData(data);
+      }
+    } catch (err) {
+      console.error('Failed to fetch admin stats:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  React.useEffect(() => {
+    fetchStats();
+    const interval = setInterval(fetchStats, 60000);
+    return () => clearInterval(interval);
+  }, []);
+
   const stats = [
-    { name: "Total Bookings", value: "1,240", icon: ClipboardList, color: "text-blue-600", bg: "bg-blue-50", trend: "+15%" },
-    { name: "Platform GMV", value: "$142,500", icon: DollarSign, color: "text-green-600", bg: "bg-green-50", trend: "+22%" },
-    { name: "Active Vendors", value: "85", icon: Store, color: "text-purple-600", bg: "bg-purple-50", trend: "+5%" },
-    { name: "Active Users", value: "4,250", icon: Users, color: "text-orange-600", bg: "bg-orange-50", trend: "+10%" },
+    { name: "Total Bookings", value: statsData ? statsData.totalBookings.toLocaleString() : '...', icon: ClipboardList, color: "text-blue-600", bg: "bg-blue-50", trend: statsData ? `${statsData.bookingGrowthPct >= 0 ? '+' : ''}${statsData.bookingGrowthPct}%` : '0%' },
+    { name: "Platform GMV", value: statsData ? `AED ${Number(statsData.platformGmv).toLocaleString()}` : '...', icon: DollarSign, color: "text-green-600", bg: "bg-green-50", trend: "+12%" },
+    { name: "Active Vendors", value: statsData ? statsData.activeVendors.toLocaleString() : '...', icon: Store, color: "text-purple-600", bg: "bg-purple-50", trend: "+4%" },
+    { name: "Active Users", value: statsData ? statsData.totalUsers.toLocaleString() : '...', icon: Users, color: "text-orange-600", bg: "bg-orange-50", trend: "+8%" },
   ];
 
   const recentVendors = [
@@ -57,14 +140,14 @@ const AdminOverview = () => {
                 <span className="text-xs font-bold text-red-500 uppercase tracking-widest">AI Security Alert</span>
               </div>
               <h2 className="text-2xl font-bold tracking-tight">Anomalous Activity Detected</h2>
-              <p className="text-white/60 text-sm mt-1 max-w-xl">Our AI has flagged 3 vendors with unusual pricing patterns and 12 suspicious booking requests in the last 24 hours.</p>
+              <p className="text-white/60 text-sm mt-1 max-w-xl">Our AI has flagged {statsData?.pendingKyv || 0} pending KYV submissions and {statsData?.openTickets || 0} open support tickets requiring urgent administrator review.</p>
             </div>
           </div>
           <div className="flex items-center space-x-4 w-full lg:w-auto">
-            <button className="flex-1 lg:flex-none bg-red-600 text-white px-8 py-4 rounded-2xl font-bold text-sm hover:bg-red-700 transition-all active:scale-95 shadow-lg shadow-red-600/20">
+            <button className="flex-1 lg:flex-none bg-red-600 text-white px-8 py-4 rounded-2xl font-bold text-sm hover:bg-red-700 transition-all active:scale-95 shadow-lg shadow-red-600/20 cursor-pointer">
               Investigate Now
             </button>
-            <button className="flex-1 lg:flex-none bg-white/10 text-white px-8 py-4 rounded-2xl font-bold text-sm hover:bg-white/20 transition-all backdrop-blur-md border border-white/10">
+            <button className="flex-1 lg:flex-none bg-white/10 text-white px-8 py-4 rounded-2xl font-bold text-sm hover:bg-white/20 transition-all backdrop-blur-md border border-white/10 cursor-pointer">
               Dismiss
             </button>
           </div>
@@ -78,10 +161,10 @@ const AdminOverview = () => {
           <p className="text-gray-500 mt-1">AI-driven insights for the CarServ Marketplace ecosystem.</p>
         </div>
         <div className="flex gap-3">
-          <button className="bg-white border border-gray-100 text-gray-700 px-6 py-3 rounded-2xl text-sm font-bold hover:bg-gray-50 flex items-center shadow-sm transition-all">
+          <button className="bg-white border border-gray-100 text-gray-700 px-6 py-3 rounded-2xl text-sm font-bold hover:bg-gray-50 flex items-center shadow-sm transition-all cursor-pointer">
             <BarChart3 className="h-4 w-4 mr-2" /> Export Reports
           </button>
-          <button className="bg-gray-900 text-white px-6 py-3 rounded-2xl text-sm font-bold hover:bg-red-600 flex items-center shadow-xl shadow-gray-900/10 transition-all">
+          <button className="bg-gray-900 text-white px-6 py-3 rounded-2xl text-sm font-bold hover:bg-red-600 flex items-center shadow-xl shadow-gray-900/10 transition-all cursor-pointer">
             <ShieldCheck className="h-4 w-4 mr-2" /> System Health
           </button>
         </div>
@@ -89,21 +172,8 @@ const AdminOverview = () => {
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        {stats.map((stat) => (
-          <div key={stat.name} className="bg-white p-8 rounded-[2rem] border border-gray-100 shadow-sm hover:shadow-xl transition-all group">
-            <div className="flex items-center justify-between mb-6">
-              <div className={cn("p-4 rounded-2xl transition-colors", stat.bg)}>
-                <stat.icon className={cn("h-6 w-6", stat.color)} />
-              </div>
-              <div className="flex flex-col items-end">
-                <span className="text-[10px] font-bold text-green-600 bg-green-50 px-2 py-1 rounded-full flex items-center uppercase tracking-widest">
-                  <ArrowUpRight className="h-3 w-3 mr-1" /> {stat.trend}
-                </span>
-              </div>
-            </div>
-            <h3 className="text-gray-400 text-xs font-bold uppercase tracking-widest">{stat.name}</h3>
-            <p className="text-3xl font-bold text-gray-900 mt-2">{stat.value}</p>
-          </div>
+        {stats.map((stat, idx) => (
+          <StatsCard key={stat.name} stat={stat} loading={loading} />
         ))}
       </div>
 

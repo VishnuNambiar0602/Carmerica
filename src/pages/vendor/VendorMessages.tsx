@@ -29,19 +29,15 @@ const VendorMessages = () => {
   }, []);
 
   React.useEffect(() => {
-    // when activeChat changes, load its messages from server-side store
-    const loadThread = async () => {
-      if (!activeChat) return;
-      try {
-        const res = await fetch('/api/messages');
-        const data = await res.json();
-        const msgs = (data.messages && data.messages[activeChat]) || [];
-        setMessages(msgs);
-      } catch (err) {
-        console.error(err);
+    if (!activeChat) return;
+    const es = new EventSource(`/api/messages/stream?threadId=${activeChat}`);
+    es.onmessage = (e) => {
+      const data = JSON.parse(e.data);
+      if (data.messages) {
+        setMessages(data.messages);
       }
     };
-    loadThread();
+    return () => es.close();
   }, [activeChat]);
 
   return (
@@ -70,7 +66,7 @@ const VendorMessages = () => {
               )}
             >
               <div className="relative">
-                <img src={chat.image} alt={chat.name} className="h-12 w-12 rounded-full object-cover" />
+                <img src={chat.image} alt={chat.name} className="h-12 w-12 rounded-full object-cover" loading="lazy" width="48" height="48" decoding="async" />
                 {chat.status === 'online' && (
                   <div className="absolute bottom-0 right-0 h-3 w-3 bg-green-500 border-2 border-white rounded-full"></div>
                 )}
@@ -102,7 +98,7 @@ const VendorMessages = () => {
         {/* Chat Header */}
         <div className="p-4 bg-white border-b border-gray-100 flex justify-between items-center">
           <div className="flex items-center space-x-3">
-            <img src={chats.find(c => c.id === activeChat)?.image} alt="Active Chat" className="h-10 w-10 rounded-full object-cover" />
+            <img src={chats.find(c => c.id === activeChat)?.image} alt="Active Chat" className="h-10 w-10 rounded-full object-cover" loading="lazy" width="40" height="40" decoding="async" />
             <div>
               <h3 className="font-bold text-gray-900 text-sm">{chats.find(c => c.id === activeChat)?.name}</h3>
               <p className="text-[10px] text-green-600 font-bold uppercase tracking-wider">Online</p>

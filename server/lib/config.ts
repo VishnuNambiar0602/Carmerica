@@ -1,3 +1,7 @@
+import dotenv from 'dotenv';
+dotenv.config({ path: '.env.local', override: false });
+dotenv.config();
+
 const isProduction = process.env.NODE_ENV === 'production';
 
 export function getJwtSecret() {
