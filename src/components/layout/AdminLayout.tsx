@@ -197,7 +197,7 @@ export const AdminLayout = () => {
   const [isSidebarOpen, setIsSidebarOpen] = React.useState(false);
 
   return (
-    <div className="flex min-h-screen bg-slate-950 text-slate-100">
+    <div className="admin-portal flex min-h-screen bg-slate-950 text-slate-100">
       <Sidebar isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} />
       <div className="flex-grow flex flex-col">
         <Header setIsOpen={setIsSidebarOpen} />

@@ -95,3 +95,23 @@ body {
     @apply bg-slate-900/80 border-slate-800/50;
   }
 }
+
+/* Admin Portal Theme Resets to prevent white-on-white text bugs */
+.admin-portal .bg-white,
+.admin-portal .bg-gray-50,
+.admin-portal .bg-gray-50\/50,
+.admin-portal .bg-gray-100 {
+  color: #111827; /* Override parent text-slate-100 */
+}
+
+.admin-portal input,
+.admin-portal textarea,
+.admin-portal select {
+  color: #111827 !important;
+  background-color: #ffffff !important;
+}
+
+.admin-portal input::placeholder,
+.admin-portal textarea::placeholder {
+  color: #9ca3af !important; /* text-gray-400 placeholder */
+}
