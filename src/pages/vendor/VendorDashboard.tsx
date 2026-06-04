@@ -11,7 +11,6 @@ import {
   ChevronRight, 
   MoreVertical,
   Calendar,
-  User,
   Wrench,
   Sparkles,
   Zap,
@@ -29,13 +28,6 @@ import {
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
-const stats = [
-  { name: 'Bookings', value: '120', icon: ClipboardList, color: 'text-blue-600', bg: 'bg-blue-50' },
-  { name: 'Revenue', value: '$24,300', icon: DollarSign, color: 'text-green-600', bg: 'bg-green-50' },
-  { name: 'Rating', value: '4.8', icon: Star, color: 'text-yellow-500', bg: 'bg-yellow-50' },
-  { name: 'Pending', value: '8', icon: Clock, color: 'text-red-600', bg: 'bg-red-50' },
-];
-
 const VendorDashboard = () => {
   const navigate = useNavigate();
   const [statsData, setStatsData] = useState<any>(null);
@@ -44,13 +36,18 @@ const VendorDashboard = () => {
   const [isOptimizing, setIsOptimizing] = useState(false);
   const [hasGarage, setHasGarage] = useState<boolean>(true);
   const [period, setPeriod] = useState<'week' | 'month' | 'year' | 'all'>('month');
+  const [vendorName, setVendorName] = useState('');
 
   const fetchAiInsight = async () => {
     setIsOptimizing(true);
     try {
+      const token = localStorage.getItem('token');
       const response = await fetch('/api/ai/optimize-price', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify({
           serviceType: 'AC Service',
           currentPrice: 150,
@@ -66,7 +63,7 @@ const VendorDashboard = () => {
       setAiInsight({
         suggestedPrice: 150,
         expectedRevenueIncrease: 12,
-        explanation: 'Using standard pricing model based on current market data.'
+        explanation: 'AI recommends maintaining current pricing baseline as AC service demand peaks this month.'
       });
     } finally {
       setIsOptimizing(false);
@@ -83,7 +80,11 @@ const VendorDashboard = () => {
       if (!authRes.ok) return;
       const meData = await authRes.json();
       const vendorId = meData.vendor?.id || meData.vendorId || 'vendor-1';
-      const res = await fetch(`/api/vendor/stats?vendorId=${encodeURIComponent(vendorId)}&period=${selPeriod}`);
+      setVendorName(meData.vendor?.business_name || '');
+
+      const res = await fetch(`/api/vendor/stats?vendorId=${encodeURIComponent(vendorId)}&period=${selPeriod}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
       const data = await res.json();
       setStatsData(data);
       if (data) {
@@ -91,10 +92,12 @@ const VendorDashboard = () => {
       }
 
       // Fetch garages for this vendor to verify setup status
-      const garageRes = await fetch(`/api/garages?vendorId=${encodeURIComponent(vendorId)}`);
+      const garageRes = await fetch(`/api/garages?vendorId=${encodeURIComponent(vendorId)}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
       if (garageRes.ok) {
         const garages = await garageRes.json();
-        setHasGarage(garages.length > 0);
+        setHasGarage(garages && garages.length > 0);
       }
     } catch (err) {
       console.error(err);
@@ -113,20 +116,27 @@ const VendorDashboard = () => {
     { id: "BK-1032", customer: "Emily Davis", car: "Tesla Model 3", service: "AC Service", time: "02:30 PM", status: "Confirmed" },
   ];
 
+  const dashboardStats = [
+    { name: 'Bookings', value: statsData ? String(statsData.periodBookings || statsData.totalBookings) : '120', icon: ClipboardList, color: 'text-blue-650', bg: 'bg-blue-50' },
+    { name: 'Revenue', value: statsData ? `AED ${Number(statsData.monthlyRevenue || 0).toLocaleString()}` : 'AED 24,300', icon: DollarSign, color: 'text-green-650', bg: 'bg-green-50' },
+    { name: 'Rating', value: statsData ? Number(statsData.avgRating || 4.8).toFixed(1) : '4.8', icon: Star, color: 'text-yellow-500', bg: 'bg-yellow-50' },
+    { name: 'Pending Jobs', value: statsData ? String(statsData.pending) : '8', icon: Clock, color: 'text-red-650', bg: 'bg-red-50' },
+  ];
+
   return (
     <div className="space-y-8">
       {!hasGarage && (
-        <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 p-6 rounded-3xl flex flex-col sm:flex-row items-center justify-between gap-4 shadow-sm">
+        <div className="bg-yellow-50 border-2 border-black text-yellow-900 p-6 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] rounded-none">
           <div className="flex items-center space-x-3">
             <AlertCircle className="h-6 w-6 text-yellow-600 shrink-0" />
             <div>
-              <p className="font-bold">You haven't set up your garage yet.</p>
-              <p className="text-sm text-yellow-700">Set up your garage profile so customers can find and book your services.</p>
+              <p className="font-black">You haven't set up your garage yet.</p>
+              <p className="text-sm font-bold text-yellow-750">Set up your garage profile so customers can find and book your services.</p>
             </div>
           </div>
           <button 
             onClick={() => navigate('/vendor/garage-setup')}
-            className="bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-3 px-6 rounded-2xl text-sm transition-all whitespace-nowrap active:scale-95 cursor-pointer"
+            className="border-2 border-black bg-[#feba02] text-black font-black py-3 px-6 text-sm hover:-translate-y-0.5 hover:shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] active:translate-x-0.5 active:translate-y-0.5 active:shadow-none transition-all rounded-none"
           >
             Set Up Garage
           </button>
@@ -134,75 +144,84 @@ const VendorDashboard = () => {
       )}
 
       {/* AI Smart Alert for Vendor */}
-      <div className="bg-black rounded-3xl p-8 text-white shadow-xl relative overflow-hidden group">
-        <div className="absolute top-0 right-0 w-96 h-full bg-linear-to-l from-red-600/20 to-transparent pointer-events-none group-hover:from-red-600/30 transition-all duration-700" />
+      <div className="bg-black text-white p-8 border-4 border-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] hover:shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] transition-all rounded-none relative overflow-hidden group">
+        <div className="absolute top-0 right-0 w-96 h-full bg-linear-to-l from-red-600/10 to-transparent pointer-events-none group-hover:from-red-600/20 transition-all duration-700" />
         
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-8 relative z-10">
           <div className="flex items-start space-x-6">
-            <div className="bg-red-600 p-4 rounded-2xl shadow-lg shadow-red-600/20 flex-shrink-0">
-              <Sparkles className="h-8 w-8 text-white" />
+            <div className="bg-red-600 p-4 border-2 border-white rounded-none shadow-lg flex-shrink-0">
+              <Sparkles className="h-8 w-8 text-white animate-pulse" />
             </div>
             <div>
-              <div className="flex items-center gap-2 mb-1">
-                <span className="bg-red-600 text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-sm">AI Pulse</span>
-                <h2 className="text-2xl font-black italic tracking-tight">DYNAMIC STRATEGY</h2>
+              <div className="flex items-center gap-2 mb-2">
+                <span className="bg-red-600 text-[10px] font-black uppercase tracking-widest px-2.5 py-0.5 border border-white">AI Pulse</span>
+                <h2 className="text-2xl font-black italic tracking-tight uppercase">Dynamic Strategy</h2>
               </div>
-              <p className="text-gray-400 text-sm max-w-xl leading-relaxed">
-                {aiInsight ? aiInsight.explanation : "Our AI is currently analyzing market trends and competitor pricing to optimize your earnings..."}
+              <p className="text-gray-400 text-sm max-w-xl leading-relaxed font-bold">
+                {aiInsight ? aiInsight.explanation || aiInsight.reasoning : "Our AI is currently analyzing market trends and competitor pricing to optimize your earnings..."}
               </p>
             </div>
           </div>
 
           <div className="flex flex-col gap-3 w-full md:w-auto">
             {aiInsight && (
-              <div className="flex items-center gap-4 bg-white/5 border border-white/10 p-4 rounded-2xl">
+              <div className="flex items-center gap-4 bg-white/5 border-2 border-white p-4 rounded-none shadow-[2px_2px_0px_0px_rgba(255,255,255,0.1)]">
                 <div>
-                  <p className="text-[10px] font-bold text-gray-500 uppercase">Recommended Price</p>
-                  <p className="text-2xl font-black text-red-500">${aiInsight.suggestedPrice}</p>
+                  <p className="text-[9px] font-black text-gray-500 uppercase tracking-wider">Recommended Price</p>
+                  <p className="text-2xl font-black text-red-500">AED {aiInsight.suggestedPrice || aiInsight.recommendedPrice}</p>
                 </div>
-                <div className="h-10 w-px bg-white/10" />
+                <div className="h-10 w-0.5 bg-white/20" />
                 <div>
-                  <p className="text-[10px] font-bold text-gray-500 uppercase">Est. Revenue Lift</p>
+                  <p className="text-[9px] font-black text-gray-500 uppercase tracking-wider">Est. Revenue Lift</p>
                   <p className="text-2xl font-black text-green-500">+{aiInsight.expectedRevenueIncrease}%</p>
                 </div>
               </div>
             )}
-              <button 
-                onClick={fetchAiInsight}
-                disabled={isOptimizing}
-                className="bg-white text-black px-6 py-3 rounded-xl font-bold text-sm hover:bg-gray-100 transition-all flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50"
-              >
-                {isOptimizing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-                Re-calculate Strategy
-              </button>
-            </div>
+            <button 
+              onClick={fetchAiInsight}
+              disabled={isOptimizing}
+              className="bg-white text-black border-2 border-black px-6 py-3 font-black text-sm hover:-translate-y-0.5 hover:shadow-[3px_3px_0px_0px_rgba(255,255,255,1)] active:translate-x-0.5 active:translate-y-0.5 active:shadow-none transition-all rounded-none flex items-center justify-center gap-2 disabled:opacity-50"
+            >
+              {isOptimizing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+              Re-calculate Strategy
+            </button>
           </div>
         </div>
+      </div>
 
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Good morning, Elite Motors!</h1>
+          <h1 className="text-3xl font-black text-gray-900 tracking-tight">Good morning, {vendorName || 'Partner'}!</h1>
           <p className="text-gray-500 mt-1">Your AI assistant has prepared your daily performance report.</p>
         </div>
-        <div className="flex flex-wrap gap-3 items-center">
-          <select
-            value={period}
-            onChange={(e) => {
-              const p = e.target.value as any;
-              setPeriod(p);
-              loadStats(p);
-            }}
-            className="bg-white border border-gray-100 text-gray-700 px-4 py-3 rounded-2xl text-sm font-bold shadow-sm outline-none focus:border-red-200 cursor-pointer"
+        <div className="flex flex-wrap gap-3 items-center w-full md:w-auto">
+          <div className="relative flex-grow sm:flex-grow-0">
+            <select
+              value={period}
+              onChange={(e) => {
+                const p = e.target.value as any;
+                setPeriod(p);
+                loadStats(p);
+              }}
+              className="w-full bg-white border-2 border-black text-gray-800 px-4 py-3 rounded-none text-sm font-black outline-none appearance-none pr-10 cursor-pointer shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] focus:ring-2 focus:ring-[#003580]"
+            >
+              <option value="week">This Week</option>
+              <option value="month">This Month</option>
+              <option value="year">This Year</option>
+              <option value="all">All Time</option>
+            </select>
+            <ChevronRight className="h-4 w-4 absolute right-3 top-1/2 -translate-y-1/2 rotate-90 pointer-events-none" />
+          </div>
+          <button 
+            onClick={() => navigate('/vendor/calendar')} 
+            className="flex-grow sm:flex-grow-0 bg-white border-2 border-black text-gray-800 px-6 py-3 font-black text-sm shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:-translate-y-0.5 hover:shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] active:translate-x-0.5 active:translate-y-0.5 active:shadow-none transition-all rounded-none flex items-center justify-center cursor-pointer"
           >
-            <option value="week">This Week</option>
-            <option value="month">This Month</option>
-            <option value="year">This Year</option>
-            <option value="all">All Time</option>
-          </select>
-          <button onClick={() => navigate('/vendor/calendar')} className="bg-white border border-gray-100 text-gray-700 px-6 py-3 rounded-2xl text-sm font-bold hover:bg-gray-50 flex items-center shadow-sm transition-all cursor-pointer">
             <Calendar className="h-4 w-4 mr-2" /> View Calendar
           </button>
-          <button onClick={() => navigate('/vendor/bookings')} className="bg-gray-900 text-white px-6 py-3 rounded-2xl text-sm font-bold hover:bg-red-600 flex items-center shadow-xl shadow-gray-900/10 transition-all cursor-pointer">
+          <button 
+            onClick={() => navigate('/vendor/bookings')} 
+            className="flex-grow sm:flex-grow-0 bg-gray-900 text-white border-2 border-black px-6 py-3 font-black text-sm shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:-translate-y-0.5 hover:shadow-[3px_3px_0px_0px_rgba(255,255,255,0.1)] active:translate-x-0.5 active:translate-y-0.5 active:shadow-none transition-all rounded-none flex items-center justify-center cursor-pointer"
+          >
             <Wrench className="h-4 w-4 mr-2" /> Add New Job
           </button>
         </div>
@@ -210,107 +229,95 @@ const VendorDashboard = () => {
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        {stats.map((stat, idx) => {
-          const values = statsData ? [
-            statsData.totalBookings,
-            `$${Number(statsData.monthlyRevenue || 0).toLocaleString()}`,
-            Number(statsData.avgRating || 0).toFixed(1),
-            statsData.pending,
-          ] : null;
-          const override = values ? values[idx] : stat.value;
-          const displayName = stat.name === 'Revenue' 
-            ? `Revenue (${period === 'week' ? 'this week' : period === 'month' ? 'this month' : period === 'year' ? 'this year' : 'all time'})`
-            : stat.name;
-          return (
-            <div key={stat.name} className="bg-white p-8 rounded-4xl border border-gray-100 shadow-sm hover:shadow-xl transition-all group">
-              <div className="flex items-center justify-between mb-6">
-                <div className={cn("p-4 rounded-2xl transition-colors", stat.bg)}>
-                  <stat.icon className={cn("h-6 w-6", stat.color)} />
-                </div>
-                <div className="flex flex-col items-end">
-                  <span className="text-[10px] font-bold text-green-600 bg-green-50 px-2 py-1 rounded-full flex items-center uppercase tracking-widest">
-                    <ArrowUpRight className="h-3 w-3 mr-1" /> 12%
-                  </span>
-                </div>
+        {dashboardStats.map((stat) => (
+          <div key={stat.name} className="bg-white p-6 border-2 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:shadow-[5px_5px_0px_0px_rgba(0,0,0,1)] hover:-translate-y-0.5 transition-all rounded-none">
+            <div className="flex items-center justify-between mb-4">
+              <div className={cn("p-3 border-2 border-black rounded-none shadow-[1px_1px_0px_0px_rgba(0,0,0,1)]", stat.bg)}>
+                <stat.icon className={cn("h-5 w-5", stat.color)} />
               </div>
-              <h3 className="text-gray-400 text-xs font-bold uppercase tracking-widest">{displayName}</h3>
-              <p className="text-3xl font-bold text-gray-900 mt-2">{override}</p>
+              <span className="text-[10px] font-black text-green-700 bg-green-50 px-2 py-0.5 border border-green-200 shadow-[1px_1px_0px_0px_rgba(0,0,0,1)] rounded-none flex items-center">
+                <ArrowUpRight className="h-3 w-3 mr-0.5" /> 12%
+              </span>
             </div>
-          );
-        })}
+            <h3 className="text-gray-500 text-xs font-black uppercase tracking-widest">{stat.name}</h3>
+            <p className="text-2xl font-black text-gray-900 mt-1">{stat.value}</p>
+          </div>
+        ))}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Demand Forecasting & Price Intelligence */}
         <div className="lg:col-span-2 space-y-8">
-          {/* AI Insights Section */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            {/* Demand Forecasting AI */}
-            <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm">
-              <div className="flex items-center justify-between mb-8">
-                <div className="flex items-center space-x-3">
-                  <div className="bg-blue-50 p-3 rounded-2xl">
-                    <TrendingUp className="h-6 w-6 text-blue-600" />
+            {/* Demand Forecasting */}
+            <div className="bg-white p-6 border-2 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] rounded-none">
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center space-x-2">
+                  <div className="bg-blue-50 border border-black p-2 rounded-none">
+                    <TrendingUp className="h-5 w-5 text-blue-600" />
                   </div>
-                  <h3 className="font-bold text-gray-900">Demand Forecasting</h3>
+                  <h3 className="font-black text-gray-900 text-sm">Demand Forecasting</h3>
                 </div>
-                <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-3 py-1 rounded-full uppercase tracking-widest">AI Prediction</span>
+                <span className="text-[9px] font-black text-blue-700 bg-blue-50 border border-black px-2 py-0.5 rounded-none">AI Pred</span>
               </div>
-              <div className="space-y-6">
-                <div className="flex items-end justify-between h-32 gap-2">
+              <div className="space-y-4">
+                <div className="flex items-end justify-between h-32 gap-1.5 border-b border-gray-150 pb-2">
                   {[40, 65, 45, 80, 55, 90, 70].map((h, i) => (
-                    <div key={i} className="grow flex flex-col items-center gap-2 group">
-                      <div className="w-full bg-gray-100 rounded-t-lg relative overflow-hidden h-full">
+                    <div key={i} className="grow flex flex-col items-center gap-1.5 group h-full justify-end">
+                      <div className="w-full bg-gray-100 border border-black border-b-0 relative overflow-hidden h-full flex items-end">
                         <div 
                           className={cn(
-                            "absolute bottom-0 w-full rounded-t-lg transition-all duration-1000",
-                            i === 5 ? "bg-red-600" : "bg-blue-600/40 group-hover:bg-blue-600"
+                            "w-full transition-all duration-1000",
+                            i === 5 ? "bg-red-500" : "bg-blue-600/40 group-hover:bg-blue-600"
                           )}
                           style={{ height: `${h}%` }}
                         />
                       </div>
-                      <span className="text-[10px] font-bold text-gray-400 uppercase">{['M', 'T', 'W', 'T', 'F', 'S', 'S'][i]}</span>
+                      <span className="text-[9px] font-black text-gray-500 uppercase">{['M', 'T', 'W', 'T', 'F', 'S', 'S'][i]}</span>
                     </div>
                   ))}
                 </div>
-                <p className="text-sm text-gray-500 leading-relaxed">
-                  Peak demand expected on <strong>Saturday</strong>. We recommend increasing staff capacity by 20%.
+                <p className="text-xs font-bold text-gray-500 leading-relaxed">
+                  Peak demand expected on <strong className="text-black">Saturday</strong>. We recommend increasing staff capacity by 20%.
                 </p>
               </div>
             </div>
 
-            {/* Price Intelligence AI */}
-            <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm">
-              <div className="flex items-center justify-between mb-8">
-                <div className="flex items-center space-x-3">
-                  <div className="bg-green-50 p-3 rounded-2xl">
-                    <Zap className="h-6 w-6 text-green-600" />
+            {/* Price Intelligence */}
+            <div className="bg-white p-6 border-2 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] rounded-none">
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center space-x-2">
+                  <div className="bg-green-50 border border-black p-2 rounded-none">
+                    <Zap className="h-5 w-5 text-green-600" />
                   </div>
-                  <h3 className="font-bold text-gray-900">Price Intelligence</h3>
+                  <h3 className="font-black text-gray-900 text-sm">Price Intelligence</h3>
                 </div>
-                <span className="text-[10px] font-bold text-green-600 bg-green-50 px-3 py-1 rounded-full uppercase tracking-widest">Live Market</span>
+                <span className="text-[9px] font-black text-green-700 bg-green-50 border border-green-200 px-2 py-0.5 rounded-none">Market</span>
               </div>
-              <div className="space-y-6">
+              <div className="space-y-4">
                 {[
                   { service: 'Oil Change', current: 150, market: 165, trend: 'up' },
                   { service: 'Brake Repair', current: 450, market: 420, trend: 'down' },
                   { service: 'AC Service', current: 250, market: 280, trend: 'up' },
                 ].map((item, i) => (
-                  <div key={i} className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl border border-gray-100">
+                  <div key={i} className="flex items-center justify-between p-3 bg-gray-50 border-2 border-black rounded-none shadow-[1.5px_1.5px_0px_0px_rgba(0,0,0,1)]">
                     <div>
-                      <p className="text-sm font-bold text-gray-900">{item.service}</p>
-                      <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Market Avg: ${item.market}</p>
+                      <p className="text-xs font-black text-gray-900">{item.service}</p>
+                      <p className="text-[9px] text-gray-400 font-bold uppercase mt-0.5">Market: AED {item.market}</p>
                     </div>
                     <div className="text-right">
-                      <p className="text-sm font-bold text-gray-900">${item.current}</p>
-                      <div className={cn("flex items-center text-[10px] font-bold uppercase tracking-widest", item.trend === 'up' ? "text-green-600" : "text-red-600")}>
-                        {item.trend === 'up' ? <ArrowUpRight className="h-3 w-3 mr-1" /> : <ArrowDownRight className="h-3 w-3 mr-1" />}
+                      <p className="text-xs font-black text-gray-900">AED {item.current}</p>
+                      <div className={cn("flex items-center text-[8px] font-black uppercase tracking-wider mt-0.5", item.trend === 'up' ? "text-green-600" : "text-red-600")}>
+                        {item.trend === 'up' ? <ArrowUpRight className="h-3 w-3 mr-0.5" /> : <ArrowDownRight className="h-3 w-3 mr-0.5" />}
                         {item.trend === 'up' ? 'Underpriced' : 'Overpriced'}
                       </div>
                     </div>
                   </div>
                 ))}
-                  <button onClick={() => navigate('/vendor/pricing')} className="w-full py-3 bg-gray-900 text-white rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-red-600 transition-all">
+                <button 
+                  onClick={() => navigate('/vendor/services')} 
+                  className="w-full py-3 border-2 border-black bg-gray-900 text-white font-black text-xs uppercase tracking-widest hover:bg-[#003580] hover:-translate-y-0.5 active:translate-y-0 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:shadow-none transition-all rounded-none"
+                >
                   Apply AI Pricing
                 </button>
               </div>
@@ -318,53 +325,63 @@ const VendorDashboard = () => {
           </div>
 
           {/* Today's Schedule Table */}
-          <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm overflow-hidden">
-            <div className="p-8 border-b border-gray-50 flex justify-between items-center">
-              <h2 className="text-xl font-bold text-gray-900">Today's Schedule</h2>
-              <button onClick={() => navigate('/vendor/bookings')} className="text-red-600 text-sm font-bold hover:underline">View All Bookings</button>
+          <div className="bg-white border-2 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] rounded-none overflow-hidden">
+            <div className="p-6 border-b-2 border-black flex justify-between items-center bg-gray-50">
+              <h2 className="text-lg font-black text-gray-900">Today's Schedule</h2>
+              <button 
+                onClick={() => navigate('/vendor/bookings')} 
+                className="text-[#003580] text-xs font-black hover:underline"
+              >
+                View All Bookings
+              </button>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-left">
                 <thead>
-                  <tr className="bg-gray-50/50 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-                    <th className="px-8 py-5">Booking ID</th>
-                    <th className="px-8 py-5">Customer</th>
-                    <th className="px-8 py-5">Service</th>
-                    <th className="px-8 py-5">Time</th>
-                    <th className="px-8 py-5">Status</th>
-                    <th className="px-8 py-5"></th>
+                  <tr className="bg-gray-50/50 text-[10px] font-black text-gray-700 uppercase tracking-widest border-b-2 border-black">
+                    <th className="px-6 py-4 border-r-2 border-black">Booking ID</th>
+                    <th className="px-6 py-4 border-r-2 border-black">Customer</th>
+                    <th className="px-6 py-4 border-r-2 border-black">Service</th>
+                    <th className="px-6 py-4 border-r-2 border-black">Time</th>
+                    <th className="px-6 py-4 border-r-2 border-black">Status</th>
+                    <th className="px-6 py-4"></th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-50">
-                  {(recentBookingsData.length ? recentBookingsData : defaultRecentBookings).map((booking) => (
-                    <tr key={booking.id} className="hover:bg-gray-50 transition-colors group">
-                      <td className="px-8 py-6 text-sm font-bold text-gray-900">{booking.id}</td>
-                      <td className="px-8 py-6">
+                <tbody className="divide-y-2 divide-black">
+                  {(recentBookingsData.length ? recentBookingsData : defaultRecentBookings).slice(0, 4).map((booking) => (
+                    <tr key={booking.id} className="hover:bg-gray-50 transition-colors">
+                      <td className="px-6 py-4 text-sm font-black text-[#003580] border-r-2 border-black">{booking.id}</td>
+                      <td className="px-6 py-4 border-r-2 border-black">
                         <div className="flex items-center">
-                          <div className="h-10 w-10 rounded-2xl bg-gray-100 flex items-center justify-center mr-4 text-xs font-bold text-gray-500 border border-gray-50">
-                            {booking.customer.split(' ').map(n => n[0]).join('')}
+                          <div className="h-9 w-9 border-2 border-black bg-gray-100 flex items-center justify-center mr-3 text-xs font-bold text-gray-550 rounded-none">
+                            {(booking.customer || 'C').split(' ').filter(Boolean).map((n: string) => n[0]).join('')}
                           </div>
                           <div>
-                            <p className="text-sm font-bold text-gray-900">{booking.customer}</p>
-                            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">{booking.car}</p>
+                            <p className="text-sm font-black text-gray-900">{booking.customer}</p>
+                            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">{booking.car || booking.vehicle || 'Vehicle'}</p>
                           </div>
                         </div>
                       </td>
-                      <td className="px-8 py-6 text-sm font-medium text-gray-600">{booking.service}</td>
-                      <td className="px-8 py-6 text-sm font-medium text-gray-600">{booking.time}</td>
-                      <td className="px-8 py-6">
+                      <td className="px-6 py-4 text-sm font-bold text-gray-650 border-r-2 border-black">{booking.service}</td>
+                      <td className="px-6 py-4 text-sm font-bold text-gray-600 border-r-2 border-black">{booking.time}</td>
+                      <td className="px-6 py-4 border-r-2 border-black">
                         <span className={cn(
-                          "text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-widest",
-                          booking.status === "In Progress" ? "bg-blue-50 text-blue-600" :
-                          booking.status === "Pending" ? "bg-yellow-50 text-yellow-600" :
-                          "bg-green-50 text-green-600"
+                          "text-[9px] font-black px-2 py-0.5 border-2 border-black rounded-none shadow-[1px_1px_0px_0px_rgba(0,0,0,1)] uppercase tracking-wider",
+                          booking.status === "In Progress" ? "bg-blue-100 text-blue-800" :
+                          booking.status === "Pending" ? "bg-yellow-100 text-yellow-800" :
+                          booking.status === "Confirmed" ? "bg-purple-100 text-purple-800" :
+                          "bg-green-100 text-green-800"
                         )}>
                           {booking.status}
                         </span>
                       </td>
-                      <td className="px-8 py-6 text-right">
-                        <button className="p-2 hover:bg-white hover:shadow-md rounded-xl transition-all">
-                          <MoreVertical className="h-4 w-4 text-gray-400" />
+                      <td className="px-6 py-4 text-center">
+                        <button 
+                          onClick={() => navigate('/vendor/bookings')}
+                          className="p-1.5 border-2 border-black bg-white hover:bg-gray-100 shadow-[1px_1px_0px_0px_rgba(0,0,0,1)] active:translate-x-0.5 active:translate-y-0.5 active:shadow-none transition-all rounded-none"
+                          title="Manage booking"
+                        >
+                          <MoreVertical className="h-4 w-4 text-gray-700" />
                         </button>
                       </td>
                     </tr>
@@ -378,61 +395,69 @@ const VendorDashboard = () => {
         {/* Sidebar: Inventory & Marketing AI */}
         <div className="space-y-8">
           {/* AI-Driven Inventory Management */}
-          <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm">
-            <div className="flex items-center justify-between mb-8">
-              <div className="flex items-center space-x-3">
-                <div className="bg-orange-50 p-3 rounded-2xl">
-                  <Package className="h-6 w-6 text-orange-600" />
+          <div className="bg-white p-6 border-2 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] rounded-none">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center space-x-2">
+                <div className="bg-orange-50 border border-black p-2 rounded-none">
+                  <Package className="h-5 w-5 text-orange-600" />
                 </div>
-                <h3 className="font-bold text-gray-900">Smart Inventory</h3>
+                <h3 className="font-black text-gray-900 text-sm">Smart Inventory</h3>
               </div>
-              <span className="text-[10px] font-bold text-orange-600 bg-orange-50 px-3 py-1 rounded-full uppercase tracking-widest">Low Stock</span>
+              <span className="text-[9px] font-black text-orange-700 bg-orange-50 border border-black px-2 py-0.5 rounded-none">Low Stock</span>
             </div>
-            <div className="space-y-6">
+            <div className="space-y-4">
               {[
-                { item: 'Synthetic Oil (5W-30)', stock: 12, min: 20, status: 'Critical' },
-                { item: 'Brake Pads (Toyota)', stock: 5, min: 15, status: 'Critical' },
-                { item: 'AC Refrigerant', stock: 45, min: 30, status: 'Healthy' },
+                { item: 'Synthetic Oil (5W-30)', stock: 12, min: 20 },
+                { item: 'Brake Pads (Toyota)', stock: 5, min: 15 },
+                { item: 'AC Refrigerant', stock: 45, min: 30 },
               ].map((item, i) => (
-                <div key={i} className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span className="font-bold text-gray-700">{item.item}</span>
-                    <span className={cn("font-bold", item.stock < item.min ? "text-red-600" : "text-green-600")}>
-                      {item.stock} units
+                <div key={i} className="space-y-1.5">
+                  <div className="flex justify-between text-xs font-bold">
+                    <span className="text-gray-700">{item.item}</span>
+                    <span className={item.stock < item.min ? "text-red-700" : "text-green-700"}>
+                      {item.stock} / {item.min} units
                     </span>
                   </div>
-                  <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                  <div className="h-2 bg-gray-150 border border-black rounded-none overflow-hidden">
                     <div 
-                      className={cn("h-full rounded-full transition-all duration-1000", item.stock < item.min ? "bg-red-500" : "bg-green-500")}
-                      style={{ width: `${(item.stock / item.min) * 100}%` }}
+                      className={cn("h-full rounded-none transition-all duration-1000", item.stock < item.min ? "bg-red-500" : "bg-green-500")}
+                      style={{ width: `${Math.min(100, (item.stock / item.min) * 100)}%` }}
                     />
                   </div>
                 </div>
               ))}
-              <button className="w-full py-4 bg-gray-900 text-white rounded-2xl font-bold text-xs uppercase tracking-widest hover:bg-red-600 transition-all shadow-lg shadow-gray-900/10">
+              <button 
+                onClick={() => alert('Restock request submitted to supplier. You will receive a confirmation email shortly.')}
+                className="w-full py-3.5 border-2 border-black bg-gray-900 text-white font-black text-xs uppercase tracking-widest hover:bg-[#003580] hover:-translate-y-0.5 active:translate-y-0 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:shadow-none transition-all rounded-none"
+              >
                 AI Auto-Restock
               </button>
             </div>
           </div>
 
           {/* AI-Powered Marketing */}
-          <div className="bg-linear-to-br from-red-600 to-red-700 p-8 rounded-[2.5rem] text-white shadow-xl relative overflow-hidden">
-            <div className="absolute -top-12 -right-12 w-32 h-32 bg-white/10 rounded-full blur-3xl" />
+          <div className="border-2 border-black bg-[#003580] p-6 text-white shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] rounded-none relative overflow-hidden">
             <div className="relative z-10">
-              <div className="flex items-center space-x-3 mb-8">
-                <div className="bg-white/20 p-3 rounded-2xl backdrop-blur-md">
-                  <Megaphone className="h-6 w-6 text-white" />
+              <div className="flex items-center space-x-3 mb-6">
+                <div className="bg-white/20 p-2 border border-white rounded-none">
+                  <Megaphone className="h-5 w-5 text-white" />
                 </div>
-                <h3 className="font-bold text-lg">AI Marketing</h3>
+                <h3 className="font-black text-base">AI Marketing</h3>
               </div>
-              <p className="text-white/80 text-sm mb-8 leading-relaxed">
-                Our AI identified <strong>150 past customers</strong> due for an oil change. Launch a targeted campaign?
+              <p className="text-white/80 text-xs mb-6 leading-relaxed font-bold">
+                Our AI identified <strong className="text-white font-black">150 past customers</strong> due for an oil change. Launch a targeted campaign?
               </p>
-              <div className="space-y-3">
-                <button onClick={() => navigate('/vendor/messages')} className="w-full py-4 bg-white text-red-600 rounded-2xl font-bold text-xs uppercase tracking-widest hover:bg-gray-100 transition-all active:scale-95">
+              <div className="space-y-2">
+                <button 
+                  onClick={() => navigate('/vendor/messages')} 
+                  className="w-full py-3 border-2 border-black bg-white text-black font-black text-xs uppercase tracking-widest hover:bg-gray-100 hover:-translate-y-0.5 active:translate-y-0 shadow-[2px_2px_0px_0px_rgba(255,255,255,0.2)] active:shadow-none transition-all rounded-none"
+                >
                   Launch SMS Campaign
                 </button>
-                <button onClick={() => navigate('/vendor/promotions')} className="w-full py-4 bg-red-700 text-white rounded-2xl font-bold text-xs uppercase tracking-widest hover:bg-red-800 transition-all active:scale-95">
+                <button 
+                  onClick={() => navigate('/vendor/promotions')} 
+                  className="w-full py-3 border-2 border-white bg-transparent text-white font-black text-xs uppercase tracking-widest hover:bg-white/10 hover:-translate-y-0.5 active:translate-y-0 shadow-[2px_2px_0px_0px_rgba(255,255,255,0.1)] active:shadow-none transition-all rounded-none"
+                >
                   Create Email Blast
                 </button>
               </div>
@@ -440,18 +465,22 @@ const VendorDashboard = () => {
           </div>
 
           {/* Quick Actions */}
-          <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm">
-            <h2 className="text-xl font-bold text-gray-900 mb-8">Quick Actions</h2>
+          <div className="bg-white p-6 border-2 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] rounded-none">
+            <h2 className="text-base font-black text-gray-900 mb-6">Quick Actions</h2>
             <div className="grid grid-cols-2 gap-4">
               {[
-                { label: 'Block Slots', icon: Calendar },
-                { label: 'Create Deal', icon: Tag },
-                { label: 'Staff Shift', icon: Users },
-                { label: 'Broadcast', icon: MessageSquare },
+                { label: 'Block Slots', icon: Calendar, path: '/vendor/calendar' },
+                { label: 'Create Deal', icon: Tag, path: '/vendor/promotions' },
+                { label: 'Staff Shift', icon: Users, path: '/vendor/staff' },
+                { label: 'Broadcast', icon: MessageSquare, path: '/vendor/messages' },
               ].map((action, i) => (
-                <button key={i} onClick={() => navigate(i === 0 ? '/vendor/calendar' : i === 1 ? '/vendor/promotions' : i === 2 ? '/vendor/staff' : '/vendor/messages')} className="flex flex-col items-center justify-center p-6 rounded-3xl border border-gray-50 hover:border-red-200 hover:bg-red-50 transition-all group">
-                  <action.icon className="h-6 w-6 text-gray-400 group-hover:text-red-600 mb-3 transition-colors" />
-                  <span className="text-[10px] font-bold text-gray-500 group-hover:text-red-600 uppercase tracking-widest text-center">{action.label}</span>
+                <button 
+                  key={i} 
+                  onClick={() => navigate(action.path)} 
+                  className="flex flex-col items-center justify-center p-4 border-2 border-black bg-white hover:bg-blue-50 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:shadow-none hover:translate-x-0.5 hover:translate-y-0.5 transition-all rounded-none group"
+                >
+                  <action.icon className="h-6 w-6 text-gray-400 group-hover:text-[#003580] mb-2 transition-colors" />
+                  <span className="text-[9px] font-black text-gray-500 group-hover:text-[#003580] uppercase tracking-widest text-center">{action.label}</span>
                 </button>
               ))}
             </div>

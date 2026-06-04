@@ -1588,10 +1588,27 @@ router.get('/vendor/calendar', requireRole('vendor', 'admin'), async (req: any, 
 router.get('/vendor/earnings', requireRole('vendor', 'admin'), async (req: any, res) => {
   const vendorId = await resolveVendorId(req);
   const vendorBookings = await db.listBookings({ vendorId });
-  const revenue = vendorBookings.reduce((sum, b) => sum + (Number(b.amount) || 0), 0);
+  const completedBookings = vendorBookings.filter(b => b.status === 'Completed');
+  const revenue = completedBookings.reduce((sum, b) => sum + (Number(b.amount) || 0), 0);
   const allPayments = await db.listPayments();
   const paid = allPayments.filter((p) => vendorBookings.some((b) => b.id === p.booking_id));
-  res.json({ vendorId, revenue, paidPayments: paid, bookings: vendorBookings });
+  
+  // Calculate payout statistics
+  const allRules = await db.listPricingRules();
+  const vendorRules = allRules.filter(r => r.vendor_id === vendorId && r.rule_type === 'payout_request');
+  const completedPayouts = vendorRules.filter(r => r.payload?.status === 'completed').reduce((sum, r) => sum + Number(r.payload?.amount || 0), 0);
+  const pendingPayoutRequests = vendorRules.filter(r => r.payload?.status === 'pending').reduce((sum, r) => sum + Number(r.payload?.amount || 0), 0);
+  
+  res.json({ 
+    vendorId, 
+    revenue, 
+    totalEarnings: revenue,
+    completedPayouts,
+    pendingPayout: Math.max(0, revenue - completedPayouts - pendingPayoutRequests),
+    actualPendingRequests: pendingPayoutRequests,
+    paidPayments: paid, 
+    bookings: vendorBookings 
+  });
 });
 
 router.get('/vendor/services', requireRole('vendor', 'admin'), async (req: any, res) => {
@@ -1709,6 +1726,73 @@ router.post('/kyv/upload', requireRole('vendor'), upload.single('document'), asy
   } catch (error) {
     console.error('[KYV Upload] Error:', error);
     res.status(500).json({ message: 'Upload failed' });
+  }
+});
+
+router.post('/vendor/logo', requireRole('vendor'), upload.single('logo'), async (req: any, res) => {
+  try {
+    const vendorId = await resolveVendorId(req);
+    if (!req.file) return res.status(400).json({ message: 'No file uploaded' });
+
+    const supabase = db.getClient();
+    let fileUrl = '';
+
+    if (supabase) {
+      const fileName = `${vendorId}/${Date.now()}-${req.file.originalname}`;
+      const { data, error } = await supabase.storage
+        .from('vendor-logos')
+        .upload(fileName, req.file.buffer, { contentType: req.file.mimetype });
+      if (!error) {
+        const { data: urlData } = supabase.storage.from('vendor-logos').getPublicUrl(fileName);
+        fileUrl = urlData.publicUrl;
+      }
+    } else {
+      fileUrl = `/uploads/logos/${Date.now()}-${req.file.originalname}`;
+    }
+
+    const vendor = req.user?.role === 'vendor' ? await db.findVendorByUserId(req.user.id) : await db.findVendorById(vendorId);
+    if (!vendor) return res.status(404).json({ message: 'Vendor not found' });
+    
+    const meta = vendor.metadata || {};
+    const updated = await db.updateVendor(vendor.id, {
+      metadata: { ...meta, logoUrl: fileUrl }
+    });
+
+    const garagesResult = await db.listGarages({ vendorId: vendor.id });
+    if (garagesResult.data && garagesResult.data.length > 0) {
+      for (const g of garagesResult.data) {
+        await db.updateGarage(g.id, { image: fileUrl });
+      }
+    }
+
+    res.json({ logoUrl: fileUrl, vendor: updated });
+  } catch (error) {
+    console.error('[Logo Upload] Error:', error);
+    res.status(500).json({ message: 'Logo upload failed' });
+  }
+});
+
+router.post('/vendor/payout-request', requireRole('vendor', 'admin'), async (req: any, res) => {
+  try {
+    const vendorId = await resolveVendorId(req);
+    const amount = Number(req.body.amount || 0);
+    if (amount <= 0) return res.status(400).json({ message: 'Amount must be greater than 0' });
+
+    const rule = {
+      id: db.generateId('pr'),
+      vendor_id: vendorId,
+      name: `Payout Request of AED ${amount}`,
+      rule_type: 'payout_request',
+      payload: { amount, status: 'pending' },
+      active: true,
+      created_at: now(),
+      updated_at: now(),
+    };
+    const created = await db.createPricingRule(rule);
+    res.status(201).json(created);
+  } catch (error) {
+    console.error('[Payout Request] Error:', error);
+    res.status(500).json({ message: 'Payout request failed' });
   }
 });
 
