@@ -30,9 +30,45 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
 }
 
 export function VendorProtectedRoute({ children }: { children: React.ReactNode }) {
+  const token = localStorage.getItem('token');
+  const location = useLocation();
+  if (!token) {
+    return <Navigate to={`/vendor/login?redirect=${encodeURIComponent(location.pathname + location.search)}`} replace />;
+  }
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    if (payload.exp && payload.exp * 1000 < Date.now()) {
+      localStorage.removeItem('token');
+      return <Navigate to={`/vendor/login?redirect=${encodeURIComponent(location.pathname + location.search)}`} replace />;
+    }
+    if (payload.role !== 'vendor' && payload.role !== 'admin') {
+      return <Navigate to="/" replace />;
+    }
+  } catch {
+    localStorage.removeItem('token');
+    return <Navigate to={`/vendor/login?redirect=${encodeURIComponent(location.pathname + location.search)}`} replace />;
+  }
   return <>{children}</>;
 }
 
 export function AdminProtectedRoute({ children }: { children: React.ReactNode }) {
+  const token = localStorage.getItem('token');
+  const location = useLocation();
+  if (!token) {
+    return <Navigate to={`/admin/login?redirect=${encodeURIComponent(location.pathname + location.search)}`} replace />;
+  }
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    if (payload.exp && payload.exp * 1000 < Date.now()) {
+      localStorage.removeItem('token');
+      return <Navigate to={`/admin/login?redirect=${encodeURIComponent(location.pathname + location.search)}`} replace />;
+    }
+    if (payload.role !== 'admin') {
+      return <Navigate to="/" replace />;
+    }
+  } catch {
+    localStorage.removeItem('token');
+    return <Navigate to={`/admin/login?redirect=${encodeURIComponent(location.pathname + location.search)}`} replace />;
+  }
   return <>{children}</>;
 }

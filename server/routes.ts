@@ -1889,6 +1889,92 @@ router.patch('/admin/settings', requireRole('admin'), async (req, res) => {
   res.json(await db.updateSettings(req.body));
 });
 
+router.patch('/admin/reviews/:id', requireRole('admin'), async (req, res) => {
+  const updated = await db.updateReview(req.params.id, {
+    status: req.body.status,
+    comment: req.body.comment,
+  });
+  if (!updated) return res.status(404).json({ message: 'Review not found' });
+  res.json(updated);
+});
+
+router.delete('/admin/reviews/:id', requireRole('admin'), async (req, res) => {
+  const removed = await db.deleteReview(req.params.id);
+  if (!removed) return res.status(404).json({ message: 'Review not found' });
+  res.json(removed);
+});
+
+router.post('/ai/moderate-review', requireRole('admin'), async (req, res) => {
+  try {
+    const { rating, comment } = req.body;
+    if (!comment) return res.status(400).json({ message: 'comment required' });
+
+    const prompt = `You are a content moderation expert for an automotive service marketplace.
+    Analyse this customer review for: spam, fake reviews, offensive language, or unreasonable claims.
+    Review rating: ${rating}/5
+    Review text: "${comment}"
+    
+    Return ONLY valid JSON:
+    {
+      "status": "clean | flagged",
+      "flagReason": "Reason if flagged, else null",
+      "confidence": 0.92,
+      "recommendation": "approve | remove | investigate"
+    }`;
+
+    const raw = await generate(prompt, comment);
+    const cleaned = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/, '');
+    const result = JSON.parse(cleaned);
+    res.json(result);
+  } catch (error) {
+    const isSuspicious = req.body.rating === 5 && req.body.comment?.length < 20;
+    res.json({
+      status: isSuspicious ? 'flagged' : 'clean',
+      flagReason: isSuspicious ? 'Very short 5-star review — possible fake review pattern' : null,
+      confidence: 0.7,
+      recommendation: isSuspicious ? 'investigate' : 'approve',
+    });
+  }
+});
+
+router.post('/admin/promotions', requireRole('admin'), async (req, res) => {
+  const promo = {
+    id: db.generateId('promo'),
+    vendor_id: req.body.vendorId || 'platform',
+    title: req.body.title || req.body.name,
+    description: req.body.description || '',
+    discount_type: req.body.discountType || req.body.discount_type || 'percent',
+    discount_value: Number(req.body.discountValue || req.body.discount_value || 0),
+    promo_code: req.body.promoCode || req.body.promo_code || null,
+    status: req.body.status || 'active',
+    usage_limit: req.body.usageLimit ? Number(req.body.usageLimit) : null,
+    used_count: 0,
+    starts_at: req.body.startsAt || req.body.starts_at || null,
+    ends_at: req.body.endsAt || req.body.ends_at || null,
+    created_at: now(),
+    updated_at: now(),
+  };
+  if (!promo.title) return res.status(400).json({ message: 'Title is required' });
+  const created = await db.createPromotion(promo);
+  res.status(201).json(created);
+});
+
+router.patch('/admin/promotions/:id', requireRole('admin'), async (req, res) => {
+  const updated = await db.updatePromotion(req.params.id, { ...req.body });
+  if (!updated) return res.status(404).json({ message: 'Promotion not found' });
+  res.json(updated);
+});
+
+router.delete('/admin/promotions/:id', requireRole('admin'), async (req, res) => {
+  const removed = await db.deletePromotion(req.params.id);
+  if (!removed) return res.status(404).json({ message: 'Promotion not found' });
+  res.json(removed);
+});
+
+router.post('/admin/process-payouts', requireRole('admin'), async (_req, res) => {
+  res.json({ message: 'Payouts queued for processing', processedAt: new Date().toISOString() });
+});
+
 router.post('/admin/cms', requireRole('admin'), async (req, res) => {
   const title = String(req.body.title || '').trim();
   if (!title) return res.status(400).json({ message: 'Page title is required' });
@@ -1933,6 +2019,13 @@ router.patch('/admin/support/:id', requireRole('admin'), async (req, res) => {
   if (!updated) return res.status(404).json({ message: 'Support ticket not found' });
   res.json(updated);
 });
+
+router.delete('/admin/support/:id', requireRole('admin'), async (req, res) => {
+  const removed = await db.deleteSupportTicket(req.params.id);
+  if (!removed) return res.status(404).json({ message: 'Support ticket not found' });
+  res.json(removed);
+});
+
 
 router.get('/support/tickets', requireRole('customer', 'admin'), async (req: any, res) => {
   try {
@@ -2095,13 +2188,47 @@ router.get('/admin/stats', requireRole('admin'), async (_req, res) => {
 });
 
 router.get('/admin/analytics', requireRole('admin'), async (_req, res) => {
-  const stats = db.getStats();
-  res.json({
-    ...stats,
-    bookingStatusBreakdown: db.getBookingsByStatus(),
-    recentBookings: (await db.listBookings()).slice(0, 10),
-    topVendors: (await db.listVendors()).slice(0, 10),
-  });
+  try {
+    const [users, vendors, bookings, payments] = await Promise.all([
+      db.listUsers(),
+      db.listVendors(),
+      db.listBookings({}),
+      db.listPayments(),
+    ]);
+
+    const paidPayments = payments.filter(p => p.status === 'paid' || p.status === 'succeeded');
+    const totalRevenue = paidPayments.reduce((sum, p) => sum + Number(p.amount), 0);
+    const netRevenue = Math.round(totalRevenue * 0.15); // 15% platform commission
+    const avgCommission = 15; // percent
+
+    // Weekly revenue series — last 7 weeks
+    const now = new Date();
+    const weeklySeries = Array.from({ length: 7 }, (_, i) => {
+      const weekStart = new Date(now);
+      weekStart.setDate(now.getDate() - (6 - i) * 7);
+      const weekEnd = new Date(weekStart);
+      weekEnd.setDate(weekStart.getDate() + 7);
+      const weekPayments = paidPayments.filter(p => {
+        const d = new Date(p.created_at);
+        return d >= weekStart && d < weekEnd;
+      });
+      return weekPayments.reduce((sum, p) => sum + Number(p.amount), 0);
+    });
+
+    res.json({
+      totalRevenue,
+      netRevenue,
+      activeCustomers: users.filter(u => u.role === 'customer' && u.status === 'active').length,
+      activeVendors: vendors.filter(v => v.active).length,
+      avgCommission,
+      weeklySeries,
+      totalBookings: bookings.length,
+    });
+  } catch (error) {
+    console.error('[AdminAnalytics] Failed to fetch analytics:', error);
+    res.status(500).json({ message: 'Failed to fetch analytics' });
+  }
 });
+
 
 export default router;

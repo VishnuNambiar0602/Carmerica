@@ -1,16 +1,101 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { BarChart3, TrendingUp, TrendingDown, Calendar, Download, Filter, ArrowUpRight, ArrowDownRight, Clock, DollarSign, User, Building2, Eye, List, Layers, Percent, Settings, Info, PieChart, Activity, Globe, MousePointer2 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
+interface AnalyticsData {
+  totalRevenue: number;
+  netRevenue: number;
+  activeCustomers: number;
+  activeVendors: number;
+  avgCommission: number;
+  weeklySeries: number[];
+  totalBookings: number;
+}
+
 const AdminAnalytics = () => {
+  const [analyticsData, setAnalyticsData] = useState<AnalyticsData | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const load = async () => {
+      setLoading(true);
+      try {
+        const token = localStorage.getItem('token');
+        const res = await fetch('/api/admin/analytics', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (res.ok) {
+          setAnalyticsData(await res.json());
+        }
+      } catch (err) {
+        console.error('Failed to load analytics data:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, []);
+
   const stats = [
-    { name: 'Total Platform Revenue', value: '$1,245,280', change: '+15.5%', icon: DollarSign, color: 'text-red-600', bg: 'bg-red-50' },
-    { name: 'Active Customers', value: '45,240', change: '+12.2%', icon: User, color: 'text-blue-600', bg: 'bg-blue-50' },
-    { name: 'Active Vendors', value: '850', change: '+5.1%', icon: Building2, color: 'text-green-600', bg: 'bg-green-50' },
-    { name: 'Avg. Commission', value: '12.5%', change: '+0.4%', icon: Percent, color: 'text-yellow-600', bg: 'bg-yellow-50' },
+    { 
+      name: 'Total Platform Revenue', 
+      value: analyticsData ? `AED ${analyticsData.totalRevenue.toLocaleString()}` : '...', 
+      change: '+15.5%', 
+      icon: DollarSign, 
+      color: 'text-red-600', 
+      bg: 'bg-red-50' 
+    },
+    { 
+      name: 'Active Customers', 
+      value: analyticsData ? analyticsData.activeCustomers.toLocaleString() : '...', 
+      change: '+12.2%', 
+      icon: User, 
+      color: 'text-blue-600', 
+      bg: 'bg-blue-50' 
+    },
+    { 
+      name: 'Active Vendors', 
+      value: analyticsData ? analyticsData.activeVendors.toLocaleString() : '...', 
+      change: '+5.1%', 
+      icon: Building2, 
+      color: 'text-green-600', 
+      bg: 'bg-green-50' 
+    },
+    { 
+      name: 'Avg. Commission', 
+      value: analyticsData ? `${analyticsData.avgCommission}%` : '...', 
+      change: '+0.4%', 
+      icon: Percent, 
+      color: 'text-yellow-600', 
+      bg: 'bg-yellow-50' 
+    },
   ];
-  const revenueSeries = [32, 48, 41, 58, 72, 66, 84];
+
+  // Map revenue values to heights (0-100) relative to maximum value
+  const rawWeeklyRevenue = analyticsData?.weeklySeries || [0, 0, 0, 0, 0, 0, 0];
+  const maxRevenue = Math.max(...rawWeeklyRevenue, 1);
+  const revenueSeries = rawWeeklyRevenue.map(val => Math.round((val / maxRevenue) * 100));
+
+  // User Acquisition chart remains illustrative or mapped from standard data
   const acquisitionSeries = [24, 38, 45, 52, 47, 61, 68];
+
+  const exportData = () => {
+    if (!analyticsData) return;
+    const headers = ['Week', 'Weekly Revenue (AED)'];
+    const rows = rawWeeklyRevenue.map((val, idx) => [`Week ${idx + 1}`, val]);
+    
+    const csvContent = "data:text/csv;charset=utf-8," 
+      + headers.join(",") + "\n"
+      + rows.map(e => e.join(",")).join("\n");
+      
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `carserv_analytics_report_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   return (
     <div className="space-y-6">
@@ -23,7 +108,11 @@ const AdminAnalytics = () => {
           <button className="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 flex items-center">
             <Calendar className="h-4 w-4 mr-2" /> Date Range
           </button>
-          <button className="bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-red-700 flex items-center">
+          <button 
+            onClick={exportData}
+            disabled={loading}
+            className="bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-red-700 flex items-center transition-colors disabled:opacity-50"
+          >
             <Download className="h-4 w-4 mr-2" /> Export Data
           </button>
         </div>
@@ -53,25 +142,41 @@ const AdminAnalytics = () => {
 
       {/* Charts Section */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Revenue Trends Chart */}
         <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
           <div className="flex justify-between items-center mb-6">
             <h2 className="font-bold text-gray-900">Revenue Trends</h2>
             <div className="flex bg-gray-100 p-1 rounded-lg">
               <button className="px-3 py-1 text-xs font-bold rounded-md bg-white shadow-sm text-gray-900">Weekly</button>
-              <button className="px-3 py-1 text-xs font-bold rounded-md text-gray-500 hover:text-gray-700">Monthly</button>
+              <button className="px-3 py-1 text-xs font-bold rounded-md text-gray-500 hover:text-gray-700" onClick={() => alert('Monthly trend data is coming soon!')}>Monthly</button>
             </div>
           </div>
-          <div className="h-64 bg-gray-50 rounded-lg border border-dashed border-gray-300 p-4 flex items-end gap-3">
-            {revenueSeries.map((value, index) => (
-              <div key={index} className="flex-1 flex flex-col items-center justify-end h-full gap-2">
-                <div className="w-full bg-red-100 rounded-t-lg overflow-hidden flex items-end h-full">
-                  <div className="w-full bg-red-600 rounded-t-lg" style={{ height: `${value}%` }} />
-                </div>
-                <span className="text-[10px] font-bold text-gray-400 uppercase">W{index + 1}</span>
-              </div>
-            ))}
-          </div>
+          {loading ? (
+            <div className="h-64 bg-gray-50 rounded-lg flex items-center justify-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-600"></div>
+            </div>
+          ) : (
+            <div className="h-64 bg-gray-50 rounded-lg border border-dashed border-gray-300 p-4 flex items-end gap-3">
+              {revenueSeries.map((percentage, index) => {
+                const actualVal = rawWeeklyRevenue[index];
+                return (
+                  <div key={index} className="flex-1 flex flex-col items-center justify-end h-full gap-2 group relative">
+                    {/* Tooltip */}
+                    <div className="absolute bottom-full mb-2 bg-gray-900 text-white text-[10px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-10 font-bold">
+                      AED {actualVal.toLocaleString()}
+                    </div>
+                    <div className="w-full bg-red-100 rounded-t-lg overflow-hidden flex items-end h-full cursor-pointer hover:bg-red-200 transition-colors">
+                      <div className="w-full bg-red-600 rounded-t-lg transition-all duration-500" style={{ height: `${percentage}%` }} />
+                    </div>
+                    <span className="text-[10px] font-bold text-gray-400 uppercase">W{index + 1}</span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
+
+        {/* User Acquisition Chart */}
         <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
           <div className="flex justify-between items-center mb-6">
             <h2 className="font-bold text-gray-900">User Acquisition</h2>
@@ -93,11 +198,14 @@ const AdminAnalytics = () => {
         </div>
       </div>
 
-      {/* Regional Performance */}
+      {/* Regional Performance Table */}
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
         <div className="p-6 border-b border-gray-100 flex justify-between items-center">
-          <h2 className="font-bold text-gray-900">Regional Performance</h2>
-          <button className="text-sm font-bold text-red-600 hover:underline">View Detailed Map</button>
+          <div>
+            <h2 className="font-bold text-gray-900">Regional Performance</h2>
+            <p className="text-xs text-gray-400 mt-0.5 font-medium">TODO: Connect to live geographical database metrics</p>
+          </div>
+          <button className="text-sm font-bold text-red-600 hover:underline" onClick={() => alert('Detailed Map visualization coming soon!')}>View Detailed Map</button>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-left">

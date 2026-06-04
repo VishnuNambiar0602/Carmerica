@@ -1167,6 +1167,22 @@ class Database {
     return review;
   }
 
+  async deleteReview(id: string): Promise<ReviewRecord | null> {
+    if (this.isSupabase && this.client) {
+      try {
+        const { data } = await this.client.from('reviews').delete().eq('id', id).select().single();
+        if (data) return data as ReviewRecord | null;
+      } catch (err) {
+        if (process.env.NODE_ENV === 'production') throw err;
+        console.warn('[DB] Supabase error, falling back to memory:', err);
+      }
+    }
+    const idx = store.reviews.findIndex((r) => r.id === id);
+    if (idx === -1) return null;
+    const [removed] = store.reviews.splice(idx, 1);
+    return removed;
+  }
+
   // --- Notifications ---
   async listNotifications(filter?: { userId?: string; unreadOnly?: boolean }): Promise<NotificationRecord[]> {
     if (this.isSupabase && this.client) {
@@ -1399,6 +1415,24 @@ class Database {
     Object.assign(ticket, updates, { updated_at: now() });
     return ticket;
   }
+
+  async deleteSupportTicket(id: string): Promise<SupportTicketRecord | null> {
+    if (this.isSupabase && this.client) {
+      try {
+        const { data } = await this.client.from('support_tickets').delete().eq('id', id).select().single();
+        if (data) return data as SupportTicketRecord | null;
+      } catch (err) {
+        if (process.env.NODE_ENV === 'production') throw err;
+        console.warn('[DB] Supabase error, falling back to memory:', err);
+      }
+    }
+    const idx = store.supportTickets.findIndex((t) => t.id === id);
+    if (idx === -1) return null;
+    const removed = store.supportTickets[idx];
+    store.supportTickets.splice(idx, 1);
+    return removed;
+  }
+
 
   // --- CMS ---
   async listCmsPages(): Promise<CmsPageRecord[]> {

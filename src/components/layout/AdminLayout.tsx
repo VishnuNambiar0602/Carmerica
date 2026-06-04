@@ -23,12 +23,28 @@ import {
 import { cn } from '../../lib/utils';
 import { NotificationBell } from '../NotificationBell';
 
+function getAdminUser() {
+  const token = localStorage.getItem('token');
+  if (!token) return null;
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    if (payload.exp && payload.exp * 1000 < Date.now()) {
+      localStorage.removeItem('token');
+      return null;
+    }
+    if (payload.role !== 'admin') return null;
+    return { id: payload.sub || payload.id, email: payload.email, role: payload.role, full_name: payload.full_name || 'Super Admin' };
+  } catch {
+    return null;
+  }
+}
+
 const Sidebar = ({ isOpen, setIsOpen }: { isOpen: boolean; setIsOpen: (val: boolean) => void }) => {
   const location = useLocation();
   
   // Check if user is authenticated
   const isAuthenticated = () => {
-    return true;
+    return !!getAdminUser();
   };
 
   const menuItems = [
@@ -102,7 +118,7 @@ const Sidebar = ({ isOpen, setIsOpen }: { isOpen: boolean; setIsOpen: (val: bool
                 onClick={() => {
                   localStorage.removeItem('token');
                   localStorage.removeItem('user');
-                  window.location.reload();
+                  window.location.href = '/admin/login';
                 }}
                 className="flex items-center space-x-3 w-full px-4 py-3 rounded-2xl text-sm font-semibold text-red-400 hover:bg-red-500/5 hover:text-red-300 transition-all border border-transparent"
               >
@@ -128,13 +144,10 @@ const Sidebar = ({ isOpen, setIsOpen }: { isOpen: boolean; setIsOpen: (val: bool
 const Header = ({ setIsOpen }: { setIsOpen: (val: boolean) => void }) => {
   // Check if user is authenticated
   const isAuthenticated = () => {
-    return true;
+    return !!getAdminUser();
   };
 
-  const getUser = () => {
-    return { id: 'user-admin', role: 'admin', email: 'admin@carmerica.com', full_name: 'Super Admin' };
-  };
-  const user = getUser();
+  const user = getAdminUser();
 
   return (
     <header className="bg-slate-900/20 backdrop-blur-md border-b border-slate-900/80 h-20 sticky top-0 z-30 flex items-center justify-between px-4 md:px-8 text-white">
@@ -161,11 +174,11 @@ const Header = ({ setIsOpen }: { setIsOpen: (val: boolean) => void }) => {
         {isAuthenticated() ? (
           <div className="flex items-center space-x-3 border-l pl-4 border-slate-900">
             <div className="text-right hidden sm:block">
-              <p className="text-sm font-semibold text-slate-200">Super Admin</p>
+              <p className="text-sm font-semibold text-slate-200">{user?.full_name || 'Super Admin'}</p>
               <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Access: Root</p>
             </div>
             <div className="h-10 w-10 rounded-2xl bg-blue-600/10 text-blue-400 border border-blue-500/20 flex items-center justify-center font-bold text-sm">
-              SA
+              {user?.full_name ? user.full_name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2) : 'SA'}
             </div>
           </div>
         ) : (

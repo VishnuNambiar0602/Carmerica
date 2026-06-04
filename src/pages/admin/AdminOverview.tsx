@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { 
   Users, 
   Store, 
@@ -27,7 +28,7 @@ import {
 import { cn } from '../../lib/utils';
 
 const StatsCard = ({ stat, loading }: { stat: any; loading: boolean }) => {
-  const [tilt, setTilt] = React.useState({ x: 0, y: 0 });
+  const [tilt, setTilt] = useState({ x: 0, y: 0 });
 
   if (loading) {
     return (
@@ -82,77 +83,162 @@ const StatsCard = ({ stat, loading }: { stat: any; loading: boolean }) => {
 };
 
 const AdminOverview = () => {
-  const [statsData, setStatsData] = React.useState<any>(null);
-  const [loading, setLoading] = React.useState(true);
+  const navigate = useNavigate();
+  const [statsData, setStatsData] = useState<any>(null);
+  const [recentVendors, setRecentVendors] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [alertDismissed, setAlertDismissed] = useState(false);
 
   const fetchStats = async () => {
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch('/api/admin/stats', {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setStatsData(data);
+      const [statsRes, vendorsRes] = await Promise.all([
+        fetch('/api/admin/stats', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        }),
+        fetch('/api/admin/vendors', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        })
+      ]);
+
+      if (statsRes.ok) {
+        const sData = await statsRes.json();
+        setStatsData(sData);
+      }
+      if (vendorsRes.ok) {
+        const vData = await vendorsRes.json();
+        // Sort by created_at desc (newest first)
+        const sorted = [...vData].sort((a: any, b: any) => {
+          return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
+        });
+        setRecentVendors(sorted.slice(0, 5));
       }
     } catch (err) {
-      console.error('Failed to fetch admin stats:', err);
+      console.error('Failed to fetch admin dashboard stats:', err);
     } finally {
       setLoading(false);
     }
   };
 
-  React.useEffect(() => {
+  useEffect(() => {
     fetchStats();
     const interval = setInterval(fetchStats, 60000);
     return () => clearInterval(interval);
   }, []);
 
   const stats = [
-    { name: "Total Bookings", value: statsData ? statsData.totalBookings.toLocaleString() : '...', icon: ClipboardList, color: "text-blue-600", bg: "bg-blue-50", trend: statsData ? `${statsData.bookingGrowthPct >= 0 ? '+' : ''}${statsData.bookingGrowthPct}%` : '0%' },
-    { name: "Platform GMV", value: statsData ? `$${Number(statsData.platformGmv).toLocaleString()}` : '...', icon: DollarSign, color: "text-green-600", bg: "bg-green-50", trend: "+12%" },
-    { name: "Active Vendors", value: statsData ? statsData.activeVendors.toLocaleString() : '...', icon: Store, color: "text-purple-600", bg: "bg-purple-50", trend: "+4%" },
-    { name: "Active Users", value: statsData ? statsData.totalUsers.toLocaleString() : '...', icon: Users, color: "text-orange-600", bg: "bg-orange-50", trend: "+8%" },
+    { 
+      name: "Total Bookings", 
+      value: statsData ? statsData.totalBookings.toLocaleString() : '...', 
+      icon: ClipboardList, 
+      color: "text-blue-600", 
+      bg: "bg-blue-50", 
+      trend: statsData ? `${statsData.bookingGrowthPct >= 0 ? '+' : ''}${statsData.bookingGrowthPct}%` : '0%' 
+    },
+    { 
+      name: "Platform GMV", 
+      value: statsData ? `AED ${Number(statsData.platformGmv).toLocaleString()}` : '...', 
+      icon: DollarSign, 
+      color: "text-green-600", 
+      bg: "bg-green-50", 
+      trend: "+12%" 
+    },
+    { 
+      name: "Active Vendors", 
+      value: statsData ? statsData.activeVendors.toLocaleString() : '...', 
+      icon: Store, 
+      color: "text-purple-600", 
+      bg: "bg-purple-50", 
+      trend: "+4%" 
+    },
+    { 
+      name: "Active Users", 
+      value: statsData ? statsData.totalUsers.toLocaleString() : '...', 
+      icon: Users, 
+      color: "text-orange-600", 
+      bg: "bg-orange-50", 
+      trend: "+8%" 
+    },
   ];
 
-  const recentVendors = [
-    { id: "V-102", name: "Elite Motors", location: "Dubai", status: "Active", joined: "2 days ago" },
-    { id: "V-103", name: "Precision Mechanics", location: "Abu Dhabi", status: "Pending", joined: "1 day ago" },
-    { id: "V-104", name: "The Garage Co.", location: "Sharjah", status: "Active", joined: "5 hours ago" },
-    { id: "V-105", name: "Auto Pros", location: "Ajman", status: "Suspended", joined: "1 week ago" },
-  ];
+  const formatTimeAgo = (dateStr: string) => {
+    if (!dateStr) return '—';
+    const d = new Date(dateStr);
+    const diffMs = Date.now() - d.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    return `${diffDays}d ago`;
+  };
+
+  const exportReports = () => {
+    if (!statsData) return;
+    const headers = ['Metric Name', 'Value'];
+    const rows = [
+      ['Total Bookings', statsData.totalBookings],
+      ['This Month Bookings', statsData.thisMonthBookings],
+      ['Booking Growth Rate', `${statsData.bookingGrowthPct}%`],
+      ['Platform GMV', `AED ${statsData.platformGmv}`],
+      ['Active Vendors', statsData.activeVendors],
+      ['Active Customers/Users', statsData.totalUsers],
+      ['Pending KYV Documents', statsData.pendingKyv],
+      ['Open Support Tickets', statsData.openTickets]
+    ];
+    
+    const csvContent = "data:text/csv;charset=utf-8," 
+      + headers.join(",") + "\n"
+      + rows.map(e => e.join(",")).join("\n");
+      
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `carserv_admin_report_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   return (
     <div className="space-y-8">
       {/* AI Smart Alert for Admin */}
-      <div className="bg-gray-900 rounded-[2.5rem] p-8 text-white shadow-2xl relative overflow-hidden border border-white/10">
-        <div className="absolute top-0 right-0 w-96 h-full bg-gradient-to-l from-red-600/20 to-transparent pointer-events-none" />
-        <div className="flex flex-col lg:flex-row items-center justify-between gap-8 relative z-10">
-          <div className="flex items-center space-x-6">
-            <div className="bg-red-600 p-4 rounded-3xl shadow-lg shadow-red-600/40">
-              <ShieldAlert className="h-8 w-8 text-white" />
-            </div>
-            <div>
-              <div className="flex items-center space-x-2 mb-1">
-                <Sparkles className="h-4 w-4 text-yellow-400 fill-current" />
-                <span className="text-xs font-bold text-red-500 uppercase tracking-widest">AI Security Alert</span>
+      {!alertDismissed && (
+        <div className="bg-gray-900 rounded-[2.5rem] p-8 text-white shadow-2xl relative overflow-hidden border border-white/10">
+          <div className="absolute top-0 right-0 w-96 h-full bg-gradient-to-l from-red-600/20 to-transparent pointer-events-none" />
+          <div className="flex flex-col lg:flex-row items-center justify-between gap-8 relative z-10">
+            <div className="flex items-center space-x-6">
+              <div className="bg-red-600 p-4 rounded-3xl shadow-lg shadow-red-600/40">
+                <ShieldAlert className="h-8 w-8 text-white" />
               </div>
-              <h2 className="text-2xl font-bold tracking-tight">Anomalous Activity Detected</h2>
-              <p className="text-white/60 text-sm mt-1 max-w-xl">Our AI has flagged {statsData?.pendingKyv || 0} pending KYV submissions and {statsData?.openTickets || 0} open support tickets requiring urgent administrator review.</p>
+              <div>
+                <div className="flex items-center space-x-2 mb-1">
+                  <Sparkles className="h-4 w-4 text-yellow-400 fill-current" />
+                  <span className="text-xs font-bold text-red-500 uppercase tracking-widest">AI Security Alert</span>
+                </div>
+                <h2 className="text-2xl font-bold tracking-tight">Anomalous Activity Detected</h2>
+                <p className="text-white/60 text-sm mt-1 max-w-xl">Our AI has flagged {statsData?.pendingKyv || 0} pending KYV submissions and {statsData?.openTickets || 0} open support tickets requiring urgent administrator review.</p>
+              </div>
             </div>
-          </div>
-          <div className="flex items-center space-x-4 w-full lg:w-auto">
-            <button className="flex-1 lg:flex-none bg-red-600 text-white px-8 py-4 rounded-2xl font-bold text-sm hover:bg-red-700 transition-all active:scale-95 shadow-lg shadow-red-600/20 cursor-pointer">
-              Investigate Now
-            </button>
-            <button className="flex-1 lg:flex-none bg-white/10 text-white px-8 py-4 rounded-2xl font-bold text-sm hover:bg-white/20 transition-all backdrop-blur-md border border-white/10 cursor-pointer">
-              Dismiss
-            </button>
+            <div className="flex items-center space-x-4 w-full lg:w-auto">
+              <button 
+                onClick={() => navigate('/admin/vendor-kyv')}
+                className="flex-1 lg:flex-none bg-red-600 text-white px-8 py-4 rounded-2xl font-bold text-sm hover:bg-red-700 transition-all active:scale-95 shadow-lg shadow-red-600/20 cursor-pointer"
+              >
+                Investigate Now
+              </button>
+              <button 
+                onClick={() => setAlertDismissed(true)}
+                className="flex-1 lg:flex-none bg-white/10 text-white px-8 py-4 rounded-2xl font-bold text-sm hover:bg-white/20 transition-all backdrop-blur-md border border-white/10 cursor-pointer"
+              >
+                Dismiss
+              </button>
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Welcome Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -161,10 +247,16 @@ const AdminOverview = () => {
           <p className="text-gray-500 mt-1">AI-driven insights for the CarServ Marketplace ecosystem.</p>
         </div>
         <div className="flex gap-3">
-          <button className="bg-white border border-gray-100 text-gray-700 px-6 py-3 rounded-2xl text-sm font-bold hover:bg-gray-50 flex items-center shadow-sm transition-all cursor-pointer">
+          <button 
+            onClick={exportReports}
+            className="bg-white border border-gray-100 text-gray-700 px-6 py-3 rounded-2xl text-sm font-bold hover:bg-gray-50 flex items-center shadow-sm transition-all cursor-pointer"
+          >
             <BarChart3 className="h-4 w-4 mr-2" /> Export Reports
           </button>
-          <button className="bg-gray-900 text-white px-6 py-3 rounded-2xl text-sm font-bold hover:bg-red-600 flex items-center shadow-xl shadow-gray-900/10 transition-all cursor-pointer">
+          <button 
+            onClick={() => window.open('/health', '_blank')}
+            className="bg-gray-900 text-white px-6 py-3 rounded-2xl text-sm font-bold hover:bg-red-600 flex items-center shadow-xl shadow-gray-900/10 transition-all cursor-pointer"
+          >
             <ShieldCheck className="h-4 w-4 mr-2" /> System Health
           </button>
         </div>
@@ -247,7 +339,10 @@ const AdminOverview = () => {
                     </div>
                   ))}
                 </div>
-                <button className="w-full py-3 bg-gray-900 text-white rounded-xl font-bold text-[10px] uppercase tracking-widest hover:bg-red-600 transition-all">
+                <button 
+                  onClick={() => navigate('/admin/pricing')}
+                  className="w-full py-3 bg-gray-900 text-white rounded-xl font-bold text-[10px] uppercase tracking-widest hover:bg-red-600 transition-all cursor-pointer"
+                >
                   View Detailed Pricing Report
                 </button>
               </div>
@@ -258,7 +353,12 @@ const AdminOverview = () => {
           <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm overflow-hidden">
             <div className="p-8 border-b border-gray-50 flex justify-between items-center">
               <h2 className="text-xl font-bold text-gray-900">Recent Vendor Registrations</h2>
-              <button className="text-red-600 text-sm font-bold hover:underline">View All Vendors</button>
+              <button 
+                onClick={() => navigate('/admin/vendors')}
+                className="text-red-600 text-sm font-bold hover:underline cursor-pointer"
+              >
+                View All Vendors
+              </button>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-left">
@@ -273,38 +373,50 @@ const AdminOverview = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
-                  {recentVendors.map((vendor) => (
-                    <tr key={vendor.id} className="hover:bg-gray-50 transition-colors group">
-                      <td className="px-8 py-6 text-sm font-bold text-gray-900">{vendor.id}</td>
-                      <td className="px-8 py-6">
-                        <div className="flex items-center">
-                          <div className="h-10 w-10 rounded-2xl bg-gray-100 flex items-center justify-center mr-4 text-xs font-bold text-gray-500 border border-gray-50">
-                            {vendor.name.split(' ').map(n => n[0]).join('')}
-                          </div>
-                          <span className="text-sm font-bold text-gray-900">{vendor.name}</span>
-                        </div>
-                      </td>
-                      <td className="px-8 py-6 text-sm text-gray-600 flex items-center">
-                        <MapPin className="h-3 w-3 mr-2 text-gray-400" /> {vendor.location}
-                      </td>
-                      <td className="px-8 py-6">
-                        <span className={cn(
-                          "text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-widest",
-                          vendor.status === "Active" ? "bg-green-50 text-green-600" :
-                          vendor.status === "Pending" ? "bg-yellow-50 text-yellow-600" :
-                          "bg-red-50 text-red-600"
-                        )}>
-                          {vendor.status}
-                        </span>
-                      </td>
-                      <td className="px-8 py-6 text-sm text-gray-600 font-medium">{vendor.joined}</td>
-                      <td className="px-8 py-6 text-right">
-                        <button className="p-2 hover:bg-white hover:shadow-md rounded-xl transition-all">
-                          <MoreVertical className="h-4 w-4 text-gray-400" />
-                        </button>
-                      </td>
+                  {loading ? (
+                    <tr>
+                      <td colSpan={6} className="px-8 py-6 text-center text-sm text-gray-400">Loading recent vendors...</td>
                     </tr>
-                  ))}
+                  ) : recentVendors.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="px-8 py-6 text-center text-sm text-gray-400">No registered vendors yet.</td>
+                    </tr>
+                  ) : (
+                    recentVendors.map((vendor) => (
+                      <tr key={vendor.id} className="hover:bg-gray-50 transition-colors group">
+                        <td className="px-8 py-6 text-sm font-bold text-gray-900">{vendor.id}</td>
+                        <td className="px-8 py-6">
+                          <div className="flex items-center">
+                            <div className="h-10 w-10 rounded-2xl bg-gray-100 flex items-center justify-center mr-4 text-xs font-bold text-gray-500 border border-gray-50">
+                              {(vendor.business_name || vendor.name || 'V').split(' ').map((n: string) => n[0]).join('')}
+                            </div>
+                            <span className="text-sm font-bold text-gray-900">{vendor.business_name || vendor.name}</span>
+                          </div>
+                        </td>
+                        <td className="px-8 py-6 text-sm text-gray-600 flex items-center mt-3">
+                          <MapPin className="h-3 w-3 mr-2 text-gray-400" /> {vendor.location || 'Not Specified'}
+                        </td>
+                        <td className="px-8 py-6">
+                          <span className={cn(
+                            "text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-widest",
+                            vendor.active ? "bg-green-50 text-green-600" : "bg-red-50 text-red-600"
+                          )}>
+                            {vendor.active ? 'Active' : 'Suspended'}
+                          </span>
+                        </td>
+                        <td className="px-8 py-6 text-sm text-gray-600 font-medium">{formatTimeAgo(vendor.created_at)}</td>
+                        <td className="px-8 py-6 text-right">
+                          <button 
+                            onClick={() => navigate(`/admin/vendor-kyv?vendorId=${vendor.id}`)}
+                            className="p-2 hover:bg-white hover:shadow-md rounded-xl transition-all"
+                            title="Verify KYV"
+                          >
+                            <ChevronRight className="h-4 w-4 text-gray-400 group-hover:text-red-600 transition-colors" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
@@ -331,7 +443,7 @@ const AdminOverview = () => {
                   <span className="text-[10px] font-bold text-red-600">High Risk</span>
                 </div>
                 <p className="text-xs text-red-700 leading-relaxed">
-                  Elite Motors requested a payout of $12,500 with 4 duplicate transaction IDs.
+                  Elite Motors requested a payout of AED 12,500 with 4 duplicate transaction IDs.
                 </p>
               </div>
               <div className="p-4 bg-yellow-50 rounded-2xl border border-yellow-100">
@@ -343,7 +455,10 @@ const AdminOverview = () => {
                   Precision Mechanics received 15 5-star reviews from the same IP address.
                 </p>
               </div>
-              <button className="w-full py-4 bg-gray-900 text-white rounded-2xl font-bold text-xs uppercase tracking-widest hover:bg-red-600 transition-all shadow-lg shadow-gray-900/10">
+              <button 
+                onClick={() => navigate('/admin/analytics')}
+                className="w-full py-4 bg-gray-900 text-white rounded-2xl font-bold text-xs uppercase tracking-widest hover:bg-red-600 transition-all shadow-lg shadow-gray-900/10 cursor-pointer"
+              >
                 Run Security Audit
               </button>
             </div>
@@ -371,7 +486,10 @@ const AdminOverview = () => {
               <p className="text-white/80 text-sm mb-8 leading-relaxed">
                 AI Support has successfully handled <strong>1,240 queries</strong> this week without human intervention.
               </p>
-              <button className="w-full py-4 bg-white text-blue-600 rounded-2xl font-bold text-xs uppercase tracking-widest hover:bg-gray-100 transition-all active:scale-95">
+              <button 
+                onClick={() => navigate('/admin/support')}
+                className="w-full py-4 bg-white text-blue-600 rounded-2xl font-bold text-xs uppercase tracking-widest hover:bg-gray-100 transition-all active:scale-95 cursor-pointer"
+              >
                 Manage Support AI
               </button>
             </div>
