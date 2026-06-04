@@ -254,7 +254,7 @@ const AdminOverview = () => {
             <BarChart3 className="h-4 w-4 mr-2" /> Export Reports
           </button>
           <button 
-            onClick={() => window.open('/health', '_blank')}
+            onClick={() => window.open('/api/health', '_blank')}
             className="bg-gray-900 text-white px-6 py-3 rounded-2xl text-sm font-bold hover:bg-red-600 flex items-center shadow-xl shadow-gray-900/10 transition-all cursor-pointer"
           >
             <ShieldCheck className="h-4 w-4 mr-2" /> System Health

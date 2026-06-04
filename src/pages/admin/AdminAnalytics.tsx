@@ -220,10 +220,10 @@ const AdminAnalytics = () => {
             </thead>
             <tbody className="divide-y divide-gray-100">
               {[
-                { name: 'Los Angeles, CA', vendors: 120, bookings: 4500, revenue: '$185,420', growth: '+12%' },
-                { name: 'San Francisco, CA', vendors: 85, bookings: 3200, revenue: '$142,150', growth: '+8%' },
-                { name: 'San Diego, CA', vendors: 65, bookings: 2100, revenue: '$98,420', growth: '+15%' },
-                { name: 'Sacramento, CA', vendors: 45, bookings: 1200, revenue: '$54,890', growth: '+5%' },
+                { name: 'Dubai Marina, Dubai', vendors: 120, bookings: 4500, revenue: 'AED 185,420', growth: '+12%' },
+                { name: 'Downtown Dubai, Dubai', vendors: 85, bookings: 3200, revenue: 'AED 142,150', growth: '+8%' },
+                { name: 'Jumeirah, Dubai', vendors: 65, bookings: 2100, revenue: 'AED 98,420', growth: '+15%' },
+                { name: 'Al Barsha, Dubai', vendors: 45, bookings: 1200, revenue: 'AED 54,890', growth: '+5%' },
               ].map((region) => (
                 <tr key={region.name} className="hover:bg-gray-50 transition-colors">
                   <td className="px-6 py-4">

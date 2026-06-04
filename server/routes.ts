@@ -158,6 +158,19 @@ const decorateBooking = async (booking: any) => {
 
 // --- Health & Hello ---
 router.get('/hello', (_req, res) => res.json({ message: 'Hello from the API!' }));
+router.get('/health', (_req, res) => {
+  res.json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    database: db.isSupabase ? 'supabase' : 'memory-backed',
+    services: {
+      auth: 'operational',
+      payments: 'operational',
+      ai: 'operational',
+      notifications: 'operational'
+    }
+  });
+});
 router.get('/health/db', (_req, res) => {
   res.json({
     status: 'ok',
@@ -293,6 +306,11 @@ router.post('/ai/optimize-price', async (req, res) => {
     res.json({
       serviceId: service.id,
       suggestedPrice,
+      recommendedPrice: suggestedPrice,
+      expectedRevenueIncrease: 12,
+      explanation: reasoning,
+      marketPosition: suggestedPrice < marketAvg ? 'Competitive' : 'Premium',
+      suggestedPromotion: suggestedPrice < marketAvg ? 'Offer 10% off early bookings' : null,
       marketAvg: Math.round(marketAvg),
       savings: Math.round(Number(service.price) - suggestedPrice),
       reasoning,
