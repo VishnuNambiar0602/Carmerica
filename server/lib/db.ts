@@ -355,13 +355,13 @@ class InMemoryStore {
     );
 
     this.payments.push(
-      { id: 'pay-1', booking_id: 'BK-1028', amount: 250, currency: 'AED', status: 'paid', refund_amount: 0, created_at: now(), updated_at: now() },
-      { id: 'pay-2', booking_id: 'BK-1033', amount: 150, currency: 'AED', status: 'paid', refund_amount: 0, created_at: now(), updated_at: now() },
+      { id: 'pay-1', booking_id: 'BK-1028', amount: 250, currency: 'USD', status: 'paid', refund_amount: 0, created_at: now(), updated_at: now() },
+      { id: 'pay-2', booking_id: 'BK-1033', amount: 150, currency: 'USD', status: 'paid', refund_amount: 0, created_at: now(), updated_at: now() },
     );
 
     this.promotions.push(
       { id: 'promo-1', vendor_id: 'vendor-1', title: 'AC Summer Deal', description: '10% off AC diagnostics', discount_type: 'percent', discount_value: 10, promo_code: 'SUMMER10', usage_limit: 100, used_count: 5, status: 'active', created_at: now(), updated_at: now() },
-      { id: 'promo-2', vendor_id: 'vendor-1', title: 'Winter Shield Offer', description: 'AED 30 discount on brake repair services', discount_type: 'value', discount_value: 30, promo_code: 'WINTER30', usage_limit: 50, used_count: 2, status: 'active', created_at: now(), updated_at: now() },
+      { id: 'promo-2', vendor_id: 'vendor-1', title: 'Winter Shield Offer', description: '$30 discount on brake repair services', discount_type: 'value', discount_value: 30, promo_code: 'WINTER30', usage_limit: 50, used_count: 2, status: 'active', created_at: now(), updated_at: now() },
     );
 
     this.staff.push(

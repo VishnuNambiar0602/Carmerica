@@ -137,7 +137,7 @@ const AdminOverview = () => {
     },
     { 
       name: "Platform GMV", 
-      value: statsData ? `AED ${Number(statsData.platformGmv).toLocaleString()}` : '...', 
+      value: statsData ? `$ ${Number(statsData.platformGmv).toLocaleString()}` : '...', 
       icon: DollarSign, 
       color: "text-green-600", 
       bg: "bg-green-50", 
@@ -182,7 +182,7 @@ const AdminOverview = () => {
       ['Total Bookings', statsData.totalBookings],
       ['This Month Bookings', statsData.thisMonthBookings],
       ['Booking Growth Rate', `${statsData.bookingGrowthPct}%`],
-      ['Platform GMV', `AED ${statsData.platformGmv}`],
+      ['Platform GMV', `$ ${statsData.platformGmv}`],
       ['Active Vendors', statsData.activeVendors],
       ['Active Customers/Users', statsData.totalUsers],
       ['Pending KYV Documents', statsData.pendingKyv],
@@ -443,7 +443,7 @@ const AdminOverview = () => {
                   <span className="text-[10px] font-bold text-red-600">High Risk</span>
                 </div>
                 <p className="text-xs text-red-700 leading-relaxed">
-                  Elite Motors requested a payout of AED 12,500 with 4 duplicate transaction IDs.
+                  Elite Motors requested a payout of $12,500 with 4 duplicate transaction IDs.
                 </p>
               </div>
               <div className="p-4 bg-yellow-50 rounded-2xl border border-yellow-100">

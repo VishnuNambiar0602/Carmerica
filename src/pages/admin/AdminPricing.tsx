@@ -264,7 +264,7 @@ const AdminPricing = () => {
             <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wider">Platform Revenue</h3>
           </div>
           <p className="text-2xl font-bold text-gray-900">
-            {statsData ? `AED ${Number(statsData.platformGmv * 0.15).toLocaleString(undefined, { maximumFractionDigits: 0 })}` : '...'}
+            {statsData ? `$ ${Number(statsData.platformGmv * 0.15).toLocaleString(undefined, { maximumFractionDigits: 0 })}` : '...'}
           </p>
         </div>
         <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
@@ -361,8 +361,8 @@ const AdminPricing = () => {
                   const displayValue = rule.rule_type === 'percentage' 
                     ? `${rule.payload?.value}%` 
                     : rule.rule_type === 'fixed' 
-                    ? `AED ${rule.payload?.value}`
-                    : `AED ${rule.payload?.value} (${rule.rule_type})`;
+                    ? `$ ${rule.payload?.value}`
+                    : `$ ${rule.payload?.value} (${rule.rule_type})`;
 
                   return (
                     <tr key={rule.id} className="hover:bg-gray-50 transition-colors">

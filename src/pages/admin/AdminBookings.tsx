@@ -119,7 +119,7 @@ const AdminBookings = () => {
       b.service,
       b.rawDate || b.date,
       b.time,
-      `AED ${b.amount.toFixed(2)}`,
+      `$ ${b.amount.toFixed(2)}`,
       b.status
     ]);
 
@@ -230,7 +230,7 @@ const AdminBookings = () => {
             <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wider">Total Revenue</h3>
           </div>
           <p className="text-2xl font-bold text-gray-900">
-            {loading ? '...' : `AED ${stats.revenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+            {loading ? '...' : `$ ${stats.revenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
           </p>
         </div>
       </div>
@@ -354,7 +354,7 @@ const AdminBookings = () => {
                       </div>
                     </td>
                     <td className="px-6 py-4 text-sm font-bold text-gray-900">
-                      AED {booking.amount.toFixed(2)}
+                      $ {booking.amount.toFixed(2)}
                     </td>
                     <td className="px-6 py-4">
                       <span className={cn(
@@ -443,7 +443,7 @@ const AdminBookings = () => {
               </div>
               <div>
                 <span className="font-bold text-gray-400 uppercase text-xs tracking-widest block">Amount</span>
-                <p className="mt-1 font-bold text-gray-900">AED {selectedBooking.amount.toFixed(2)}</p>
+                <p className="mt-1 font-bold text-gray-900">$ {selectedBooking.amount.toFixed(2)}</p>
               </div>
               <div>
                 <span className="font-bold text-gray-400 uppercase text-xs tracking-widest block">Date & Time</span>

@@ -90,7 +90,7 @@ create table if not exists payments (
   id text primary key,
   booking_id text references bookings(id) on delete cascade,
   amount numeric(12,2) not null default 0,
-  currency text not null default 'AED',
+  currency text not null default 'USD',
   status text not null default 'pending',
   provider text,
   provider_payment_id text,

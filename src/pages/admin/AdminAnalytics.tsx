@@ -39,7 +39,7 @@ const AdminAnalytics = () => {
   const stats = [
     { 
       name: 'Total Platform Revenue', 
-      value: analyticsData ? `AED ${analyticsData.totalRevenue.toLocaleString()}` : '...', 
+      value: analyticsData ? `$ ${analyticsData.totalRevenue.toLocaleString()}` : '...', 
       change: '+15.5%', 
       icon: DollarSign, 
       color: 'text-red-600', 
@@ -81,7 +81,7 @@ const AdminAnalytics = () => {
 
   const exportData = () => {
     if (!analyticsData) return;
-    const headers = ['Week', 'Weekly Revenue (AED)'];
+    const headers = ['Week', 'Weekly Revenue (USD)'];
     const rows = rawWeeklyRevenue.map((val, idx) => [`Week ${idx + 1}`, val]);
     
     const csvContent = "data:text/csv;charset=utf-8," 
@@ -163,7 +163,7 @@ const AdminAnalytics = () => {
                   <div key={index} className="flex-1 flex flex-col items-center justify-end h-full gap-2 group relative">
                     {/* Tooltip */}
                     <div className="absolute bottom-full mb-2 bg-gray-900 text-white text-[10px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-10 font-bold">
-                      AED {actualVal.toLocaleString()}
+                      $ {actualVal.toLocaleString()}
                     </div>
                     <div className="w-full bg-red-100 rounded-t-lg overflow-hidden flex items-end h-full cursor-pointer hover:bg-red-200 transition-colors">
                       <div className="w-full bg-red-600 rounded-t-lg transition-all duration-500" style={{ height: `${percentage}%` }} />
@@ -220,10 +220,10 @@ const AdminAnalytics = () => {
             </thead>
             <tbody className="divide-y divide-gray-100">
               {[
-                { name: 'Dubai Marina, Dubai', vendors: 120, bookings: 4500, revenue: 'AED 185,420', growth: '+12%' },
-                { name: 'Downtown Dubai, Dubai', vendors: 85, bookings: 3200, revenue: 'AED 142,150', growth: '+8%' },
-                { name: 'Jumeirah, Dubai', vendors: 65, bookings: 2100, revenue: 'AED 98,420', growth: '+15%' },
-                { name: 'Al Barsha, Dubai', vendors: 45, bookings: 1200, revenue: 'AED 54,890', growth: '+5%' },
+                { name: 'Dubai Marina, Dubai', vendors: 120, bookings: 4500, revenue: '$ 185,420', growth: '+12%' },
+                { name: 'Downtown Dubai, Dubai', vendors: 85, bookings: 3200, revenue: '$ 142,150', growth: '+8%' },
+                { name: 'Jumeirah, Dubai', vendors: 65, bookings: 2100, revenue: '$ 98,420', growth: '+15%' },
+                { name: 'Al Barsha, Dubai', vendors: 45, bookings: 1200, revenue: '$ 54,890', growth: '+5%' },
               ].map((region) => (
                 <tr key={region.name} className="hover:bg-gray-50 transition-colors">
                   <td className="px-6 py-4">

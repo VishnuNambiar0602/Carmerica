@@ -49,7 +49,7 @@ function mustGetStripe() {
   return stripeClient;
 }
 
-export async function createPaymentIntent(amount: number, currency: string = 'aed', metadata: Record<string, string> = {}): Promise<PaymentIntentResult> {
+export async function createPaymentIntent(amount: number, currency: string = 'usd', metadata: Record<string, string> = {}): Promise<PaymentIntentResult> {
   if (!stripeClient) {
     return {
       id: `pi_mock_${Date.now()}`,
@@ -70,7 +70,7 @@ export async function createPaymentIntent(amount: number, currency: string = 'ae
 
 export async function confirmPaymentIntent(paymentIntentId: string): Promise<PaymentIntentResult> {
   if (!stripeClient) {
-    return { id: paymentIntentId, amount: 0, currency: 'aed', status: 'succeeded' };
+    return { id: paymentIntentId, amount: 0, currency: 'usd', status: 'succeeded' };
   }
   const pi = await mustGetStripe().paymentIntents.retrieve(paymentIntentId);
   return { id: pi.id, amount: pi.amount / 100, currency: pi.currency, status: pi.status };
@@ -78,7 +78,7 @@ export async function confirmPaymentIntent(paymentIntentId: string): Promise<Pay
 
 export async function cancelPaymentIntent(paymentIntentId: string): Promise<PaymentIntentResult> {
   if (!stripeClient) {
-    return { id: paymentIntentId, amount: 0, currency: 'aed', status: 'canceled' };
+    return { id: paymentIntentId, amount: 0, currency: 'usd', status: 'canceled' };
   }
   const pi = await mustGetStripe().paymentIntents.cancel(paymentIntentId);
   return { id: pi.id, amount: pi.amount / 100, currency: pi.currency, status: pi.status };

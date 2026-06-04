@@ -110,8 +110,8 @@ const AdminPayments = () => {
         t.created_at,
         customer,
         vendor,
-        `AED ${amount.toFixed(2)}`,
-        `AED ${fee.toFixed(2)}`,
+        `$ ${amount.toFixed(2)}`,
+        `$ ${fee.toFixed(2)}`,
         t.status,
         t.stripe_payment_intent_id || '—'
       ];
@@ -197,7 +197,7 @@ const AdminPayments = () => {
             <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wider">Gross Volume</h3>
           </div>
           <p className="text-2xl font-bold text-gray-900">
-            {loading ? '...' : `AED ${stats.gross.toLocaleString()}`}
+            {loading ? '...' : `$ ${stats.gross.toLocaleString()}`}
           </p>
         </div>
         <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
@@ -208,7 +208,7 @@ const AdminPayments = () => {
             <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wider">Net Commission</h3>
           </div>
           <p className="text-2xl font-bold text-gray-900">
-            {loading ? '...' : `AED ${stats.net.toLocaleString()}`}
+            {loading ? '...' : `$ ${stats.net.toLocaleString()}`}
           </p>
         </div>
         <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
@@ -219,7 +219,7 @@ const AdminPayments = () => {
             <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wider">Pending Payouts</h3>
           </div>
           <p className="text-2xl font-bold text-gray-900">
-            {loading ? '...' : `AED ${stats.pending.toLocaleString()}`}
+            {loading ? '...' : `$ ${stats.pending.toLocaleString()}`}
           </p>
         </div>
         <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
@@ -321,8 +321,8 @@ const AdminPayments = () => {
                       <td className="px-6 py-4 text-sm text-gray-600">{formatPaymentDate(txn.created_at)}</td>
                       <td className="px-6 py-4 text-sm font-medium text-gray-900">{customer}</td>
                       <td className="px-6 py-4 text-sm text-gray-600">{vendor}</td>
-                      <td className="px-6 py-4 text-sm font-bold text-gray-900">AED {amount.toFixed(2)}</td>
-                      <td className="px-6 py-4 text-sm font-bold text-red-600">AED {fee.toFixed(2)}</td>
+                      <td className="px-6 py-4 text-sm font-bold text-gray-900">$ {amount.toFixed(2)}</td>
+                      <td className="px-6 py-4 text-sm font-bold text-red-600">$ {fee.toFixed(2)}</td>
                       <td className="px-6 py-4">
                         <span className={cn(
                           "text-xs font-bold px-2 py-1 rounded-full uppercase",
@@ -418,7 +418,7 @@ const AdminPayments = () => {
               </div>
               <div>
                 <span className="font-bold text-gray-400 uppercase text-xs tracking-widest block">Refunded Amount</span>
-                <p className="mt-1 font-medium text-red-600">AED {(Number(selectedTxn.refund_amount) || 0).toFixed(2)}</p>
+                <p className="mt-1 font-medium text-red-600">$ {(Number(selectedTxn.refund_amount) || 0).toFixed(2)}</p>
               </div>
               <div>
                 <span className="font-bold text-gray-400 uppercase text-xs tracking-widest block">Transaction Status</span>
@@ -435,22 +435,22 @@ const AdminPayments = () => {
               </div>
               <div>
                 <span className="font-bold text-gray-400 uppercase text-xs tracking-widest block">Currency</span>
-                <p className="mt-1 font-semibold uppercase text-gray-700">{selectedTxn.currency || 'AED'}</p>
+                <p className="mt-1 font-semibold uppercase text-gray-700">{selectedTxn.currency || 'USD'}</p>
               </div>
             </div>
 
             <div className="bg-gray-50 border border-gray-100 rounded-xl p-4 space-y-2 text-sm">
               <div className="flex justify-between font-medium text-gray-600">
                 <span>Gross Amount:</span>
-                <span className="text-gray-900">AED {(Number(selectedTxn.amount) || 0).toFixed(2)}</span>
+                <span className="text-gray-900">$ {(Number(selectedTxn.amount) || 0).toFixed(2)}</span>
               </div>
               <div className="flex justify-between font-medium text-red-600">
                 <span>Platform Commission (15%):</span>
-                <span>AED {(Number(selectedTxn.fee) || 0).toFixed(2)}</span>
+                <span>$ {(Number(selectedTxn.fee) || 0).toFixed(2)}</span>
               </div>
               <div className="flex justify-between font-bold text-gray-900 border-t pt-2 mt-2">
                 <span>Vendor Settlement Amount:</span>
-                <span>AED {((Number(selectedTxn.amount) || 0) * 0.85).toFixed(2)}</span>
+                <span>$ {((Number(selectedTxn.amount) || 0) * 0.85).toFixed(2)}</span>
               </div>
             </div>
 

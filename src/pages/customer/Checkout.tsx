@@ -259,7 +259,7 @@ const Checkout = () => {
         const intentRes = await fetch('/api/payments/create-intent', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ amount: finalPrice, currency: 'aed', bookingId: data.id })
+          body: JSON.stringify({ amount: finalPrice, currency: 'usd', bookingId: data.id })
         });
         const intentData = await intentRes.json();
         if (intentRes.ok && intentData.clientSecret) {

@@ -1027,7 +1027,7 @@ router.get('/payments/config', (_req, res) => {
 
 router.post('/payments/create-intent', async (req, res) => {
   try {
-    const { amount, currency = 'aed', bookingId, metadata = {} } = req.body;
+    const { amount, currency = 'usd', bookingId, metadata = {} } = req.body;
     if (!amount || amount <= 0) return res.status(400).json({ message: 'Invalid amount' });
     const pi = await createPaymentIntent(amount, currency, { ...metadata, bookingId: bookingId || '' });
     if (bookingId) {

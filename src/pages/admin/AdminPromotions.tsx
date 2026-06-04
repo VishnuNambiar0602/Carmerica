@@ -240,7 +240,7 @@ const AdminPromotions = () => {
             <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wider">Est. Deal Value</h3>
           </div>
           <p className="text-2xl font-bold text-gray-900">
-            {loading ? '...' : `AED ${stats.estimatedValue.toLocaleString(undefined, { maximumFractionDigits: 0 })}`}
+            {loading ? '...' : `$${stats.estimatedValue.toLocaleString(undefined, { maximumFractionDigits: 0 })}`}
           </p>
         </div>
       </div>
@@ -306,7 +306,7 @@ const AdminPromotions = () => {
                         </span>
                       </td>
                       <td className="px-6 py-4 text-sm font-bold text-red-600">
-                        {promo.discount_type === 'percent' ? `${promo.discount_value}% Off` : promo.discount_type === 'fixed' ? `AED ${promo.discount_value} Off` : 'Free service'}
+                        {promo.discount_type === 'percent' ? `${promo.discount_value}% Off` : promo.discount_type === 'fixed' ? `$${promo.discount_value} Off` : 'Free service'}
                       </td>
                       <td className="px-6 py-4">
                         <span className={cn(
@@ -409,7 +409,7 @@ const AdminPromotions = () => {
                     className="w-full p-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 text-sm font-medium bg-white"
                   >
                     <option value="percent">Percentage Off</option>
-                    <option value="fixed">Fixed AED Discount</option>
+                    <option value="fixed">Fixed USD Discount</option>
                     <option value="freebie">Free Service Gift</option>
                   </select>
                 </div>
