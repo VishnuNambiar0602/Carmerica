@@ -7,9 +7,10 @@ import { cn } from '../lib/utils';
 interface Props {
   userId: string;
   role: 'customer' | 'vendor' | 'admin';
+  isDarkHeader?: boolean;
 }
 
-export function NotificationBell({ userId, role }: Props) {
+export function NotificationBell({ userId, role, isDarkHeader = false }: Props) {
   const { notifications, unreadCount } = useNotifications(userId);
   const [open, setOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -78,9 +79,14 @@ export function NotificationBell({ userId, role }: Props) {
       <button 
         type="button"
         onClick={() => setOpen(!open)} 
-        className="relative p-2 rounded-xl hover:bg-gray-100 transition-colors cursor-pointer select-none"
+        className={cn(
+          "relative p-2 rounded-xl transition-colors cursor-pointer select-none",
+          isDarkHeader 
+            ? "hover:bg-blue-800/40 text-blue-100 hover:text-white" 
+            : "hover:bg-gray-100 text-gray-600"
+        )}
       >
-        <Bell className="h-5 w-5 text-gray-600" />
+        <Bell className="h-5 w-5" />
         {unreadCount > 0 && (
           <span className="absolute -top-1 -right-1 h-5 w-5 bg-red-600 text-white
             text-[10px] font-bold rounded-full flex items-center justify-center animate-pulse">

@@ -35,15 +35,15 @@ const Navbar = () => {
   ];
 
   return (
-    <nav className="bg-white border-b border-gray-150 sticky top-0 z-50">
+    <nav className="bg-[#003580] border-b border-blue-900 sticky top-0 z-50 text-white">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           
           {/* Logo and Left Nav links */}
           <div className="flex items-center gap-6">
             <Link to="/" className="flex items-center space-x-2 mr-2">
-              <Car className="h-5 w-5 text-blue-600" />
-              <span className="text-lg font-black tracking-tight text-gray-900">Carmerica</span>
+              <Car className="h-5 w-5 text-blue-200" />
+              <span className="text-lg font-black tracking-tight text-white">Carmerica</span>
             </Link>
             <div className="hidden lg:flex items-center space-x-1">
               {navLinks.map((link) => {
@@ -56,8 +56,8 @@ const Navbar = () => {
                     className={cn(
                       "px-3 py-1.5 rounded-none text-[10px] font-bold uppercase tracking-wider transition-all flex items-center gap-1.5 border border-transparent",
                       isActive 
-                        ? "bg-blue-50 text-blue-600 border-blue-100/50" 
-                        : "text-gray-500 hover:bg-gray-50 hover:text-gray-950"
+                        ? "bg-blue-950 text-white border-blue-700/60" 
+                        : "text-blue-100 hover:bg-blue-800/40 hover:text-white"
                     )}
                   >
                     <Icon className="h-3.5 w-3.5" />
@@ -72,23 +72,23 @@ const Navbar = () => {
           <div className="hidden lg:flex items-center space-x-4">
             <Link 
               to="/vendor/login" 
-              className="text-[10px] font-bold uppercase tracking-wider text-gray-500 hover:text-blue-600 transition-colors flex items-center gap-1.5"
+              className="text-[10px] font-bold uppercase tracking-wider text-blue-100 hover:text-white transition-colors flex items-center gap-1.5"
             >
-              <Briefcase className="h-3.5 w-3.5 text-gray-400" /> List your garage
+              <Briefcase className="h-3.5 w-3.5 text-blue-300" /> List your garage
             </Link>
             
-            <button className="p-2 text-gray-400 hover:text-gray-900 rounded-none transition-colors">
+            <button className="p-2 text-blue-200 hover:text-white hover:bg-blue-800/40 rounded-none transition-colors">
               <Globe className="h-4 w-4" />
             </button>
             
             {isAuthenticated() ? (
               <div className="flex items-center gap-4">
-                <NotificationBell userId={user?.id || 'user-1'} role="customer" />
+                <NotificationBell userId={user?.id || 'user-1'} role="customer" isDarkHeader={true} />
                 <Link 
                   to="/profile" 
-                  className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-gray-500 hover:text-gray-950 bg-gray-50 border border-gray-150 px-3 py-1.5 rounded-none"
+                  className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-blue-100 hover:text-white bg-blue-900/60 border border-blue-800/60 px-3 py-1.5 rounded-none hover:bg-blue-850/50"
                 >
-                  <User className="h-3.5 w-3.5 text-gray-450" />
+                  <User className="h-3.5 w-3.5 text-blue-300" />
                   Profile
                 </Link>
                 <button 
@@ -98,7 +98,7 @@ const Navbar = () => {
                     localStorage.removeItem('vendor');
                     window.location.reload();
                   }}
-                  className="text-[10px] font-bold uppercase tracking-wider text-red-600 hover:text-red-500 bg-red-50/50 px-3 py-1.5 rounded-none transition-all flex items-center gap-1"
+                  className="text-[10px] font-bold uppercase tracking-wider text-red-200 hover:text-white bg-red-950/40 border border-red-900/50 px-3 py-1.5 rounded-none transition-all flex items-center gap-1 hover:bg-red-900/50"
                 >
                   <LogOut className="h-3.5 w-3.5" />
                   Log out
@@ -107,7 +107,7 @@ const Navbar = () => {
             ) : (
               <Link 
                 to="/login" 
-                className="bg-blue-600 hover:bg-blue-700 text-white px-3.5 py-1.5 rounded-none text-[10px] font-bold uppercase tracking-wider transition-all flex items-center gap-1.5"
+                className="bg-white hover:bg-blue-50 text-[#003580] px-3.5 py-1.5 rounded-none text-[10px] font-extrabold uppercase tracking-wider transition-all flex items-center gap-1.5 border border-transparent"
               >
                 <LogIn className="h-3.5 w-3.5" />
                 Sign in
@@ -118,7 +118,7 @@ const Navbar = () => {
           <div className="lg:hidden">
             <button
               onClick={() => setIsMenuOpen(!isMenuOpen)}
-              className="p-2 rounded-none hover:bg-gray-50 text-gray-600"
+              className="p-2 rounded-none hover:bg-blue-900 text-blue-100 hover:text-white"
             >
               <Menu className="h-6 w-6" />
             </button>
@@ -128,7 +128,7 @@ const Navbar = () => {
 
       {/* Mobile menu */}
       {isMenuOpen && (
-        <div className="lg:hidden bg-white border-t border-gray-100 px-3 py-3 space-y-1">
+        <div className="lg:hidden bg-[#002c6a] border-t border-blue-900 px-3 py-3 space-y-1">
           {navLinks.map((link) => {
             const isActive = location.pathname === link.path;
             const Icon = link.icon;
@@ -138,34 +138,34 @@ const Navbar = () => {
                 to={link.path}
                 className={cn(
                   "px-4 py-2.5 rounded-none text-[10px] font-bold uppercase tracking-wider flex items-center gap-2",
-                  isActive ? "bg-blue-50 text-blue-600" : "text-gray-600 hover:bg-gray-50"
+                  isActive ? "bg-blue-950 text-white border-l-2 border-blue-400" : "text-blue-100 hover:bg-blue-800/40"
                 )}
                 onClick={() => setIsMenuOpen(false)}
               >
-                <Icon className="h-4 w-4 text-gray-400" />
+                <Icon className="h-4 w-4 text-blue-300" />
                 {link.name}
               </Link>
             );
           })}
           <Link
             to="/vendor/login"
-            className="flex items-center gap-2 px-4 py-2.5 rounded-none text-[10px] font-bold uppercase tracking-wider text-gray-600 hover:bg-gray-50"
+            className="flex items-center gap-2 px-4 py-2.5 rounded-none text-[10px] font-bold uppercase tracking-wider text-blue-100 hover:bg-blue-800/40"
             onClick={() => setIsMenuOpen(false)}
           >
-            <Briefcase className="h-4 w-4 text-gray-450" /> List your garage
+            <Briefcase className="h-4 w-4 text-blue-300" /> List your garage
           </Link>
           {isAuthenticated() ? (
-            <div className="pt-2 border-t border-gray-100 space-y-1">
-              <div className="px-4 py-2.5 flex items-center justify-between bg-gray-50 rounded-none">
-                <span className="text-[10px] font-bold uppercase text-gray-400">Notifications</span>
-                <NotificationBell userId={user?.id || 'user-1'} role="customer" />
+            <div className="pt-2 border-t border-blue-900 space-y-1">
+              <div className="px-4 py-2.5 flex items-center justify-between bg-blue-950/40 rounded-none">
+                <span className="text-[10px] font-bold uppercase text-blue-200">Notifications</span>
+                <NotificationBell userId={user?.id || 'user-1'} role="customer" isDarkHeader={true} />
               </div>
               <Link
                 to="/profile"
-                className="px-4 py-2.5 rounded-none text-[10px] font-bold uppercase tracking-wider bg-gray-50 text-gray-800 text-center flex items-center justify-center gap-2"
+                className="px-4 py-2.5 rounded-none text-[10px] font-bold uppercase tracking-wider bg-blue-900/60 text-white text-center flex items-center justify-center gap-2 border border-blue-800/50 hover:bg-blue-850/50"
                 onClick={() => setIsMenuOpen(false)}
               >
-                <User className="h-4 w-4 text-gray-400" />
+                <User className="h-4 w-4 text-blue-300" />
                 Profile
               </Link>
               <button 
@@ -176,7 +176,7 @@ const Navbar = () => {
                   setIsMenuOpen(false);
                   window.location.reload();
                 }}
-                className="w-full px-4 py-2.5 rounded-none text-[10px] font-bold uppercase tracking-wider bg-red-50 text-red-600 text-center flex items-center justify-center gap-2"
+                className="w-full px-4 py-2.5 rounded-none text-[10px] font-bold uppercase tracking-wider bg-red-950/40 text-red-200 text-center flex items-center justify-center gap-2 border border-red-900/50 hover:bg-red-900/50"
               >
                 <LogOut className="h-4 w-4" />
                 Log out
@@ -185,7 +185,7 @@ const Navbar = () => {
           ) : (
             <Link
               to="/login"
-              className="px-4 py-2.5 rounded-none text-[10px] font-bold uppercase tracking-wider bg-blue-600 text-white text-center shadow-sm flex items-center justify-center gap-1.5"
+              className="px-4 py-2.5 rounded-none text-[10px] font-bold uppercase tracking-wider bg-white text-[#003580] text-center shadow-sm flex items-center justify-center gap-1.5"
               onClick={() => setIsMenuOpen(false)}
             >
               <LogIn className="h-4 w-4" />

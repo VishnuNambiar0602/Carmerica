@@ -57,7 +57,7 @@ const Home = () => {
     <div className="flex flex-col bg-white text-gray-900 overflow-x-hidden">
       
       {/* Hero Section - Split Grid, Dotted Background, Sharp Edges, Dual-Tone Blue & White */}
-      <section className="relative pt-24 pb-28 px-4 sm:px-6 lg:px-8 bg-gradient-to-b from-blue-50/40 to-white border-b border-gray-150 overflow-hidden">
+      <section className="relative pt-24 pb-28 px-4 sm:px-6 lg:px-8 bg-gradient-to-b from-blue-50/80 via-blue-50/30 to-white border-b border-blue-100/50 overflow-hidden">
         
         {/* Subtle grid pattern to add rich texture */}
         <div className="absolute inset-0 bg-[radial-gradient(#e2e8f0_1px,transparent_1px)] [background-size:20px_20px] pointer-events-none opacity-80" />
@@ -115,19 +115,19 @@ const Home = () => {
           </div>
 
           {/* New Statistics Display (Replaces platform status ticker) */}
-          <div className="w-full max-w-3xl border-t border-gray-150 pt-8 mt-4">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 sm:gap-4 divide-y sm:divide-y-0 sm:divide-x divide-gray-150">
+          <div className="w-full max-w-3xl bg-blue-50/45 border border-blue-100/60 p-4 mt-6">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 sm:gap-4 divide-y sm:divide-y-0 sm:divide-x divide-blue-200/50">
               <div className="flex flex-col items-center justify-center p-2">
                 <span className="text-3xl font-black text-blue-600 tracking-tight">15,000+</span>
-                <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mt-1">Customers Served</span>
+                <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider mt-1">Customers Served</span>
               </div>
               <div className="flex flex-col items-center justify-center p-2">
                 <span className="text-3xl font-black text-blue-600 tracking-tight">218+</span>
-                <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mt-1">Accredited Garages</span>
+                <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider mt-1">Accredited Garages</span>
               </div>
               <div className="flex flex-col items-center justify-center p-2">
                 <span className="text-3xl font-black text-blue-600 tracking-tight">45,000+</span>
-                <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mt-1">Deliveries Done</span>
+                <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider mt-1">Deliveries Done</span>
               </div>
             </div>
           </div>
@@ -135,7 +135,7 @@ const Home = () => {
       </section>
 
       {/* Structured Vetting Workflow Process Section */}
-      <section className="py-20 px-4 sm:px-6 lg:px-8 bg-gray-50 border-b border-gray-150 flex flex-col items-center">
+      <section className="py-20 px-4 sm:px-6 lg:px-8 bg-[#f2f6fc] border-b border-blue-100/40 flex flex-col items-center">
         <div className="max-w-7xl w-full text-center">
           <div className="flex flex-col items-center mb-12">
             <span className="text-blue-650 text-xs font-black uppercase tracking-widest">Network Blueprint</span>
@@ -151,7 +151,7 @@ const Home = () => {
               { step: '02', title: 'Automated Rate Auditing', desc: 'The auditor scans nearby historic labor invoices to flags margins that exceed regional averages.' },
               { step: '03', title: 'Vetted Direct Booking', desc: 'Book appointments with partner garages that carry verified technician credentials.' }
             ].map((process, i) => (
-              <div key={i} className="bg-white border border-gray-150 p-6 text-left relative flex flex-col justify-between">
+              <div key={i} className="bg-white border border-blue-100/50 p-6 text-left relative flex flex-col justify-between shadow-[0_4px_20px_rgba(0,0,0,0.01)] rounded-none">
                 <span className="text-4xl font-extrabold text-blue-600/10 absolute top-4 right-4">{process.step}</span>
                 <div className="space-y-3">
                   <h4 className="font-extrabold text-gray-950 text-sm">{process.title}</h4>
@@ -189,7 +189,7 @@ const Home = () => {
             ].map((item, i) => (
               <div 
                 key={i} 
-                className="bg-white rounded-none overflow-hidden border border-gray-200 hover:border-blue-300 shadow-[0_10px_30px_rgba(0,0,0,0.02)] hover:shadow-[0_15px_45px_rgba(37,99,235,0.06)] transition-all duration-300 group cursor-pointer flex flex-col justify-between"
+                className="bg-white rounded-none overflow-hidden border border-gray-200 hover:border-blue-600 shadow-[0_10px_30px_rgba(0,0,0,0.02)] hover:shadow-[0_15px_45px_rgba(37,99,235,0.06)] transition-all duration-300 group cursor-pointer flex flex-col justify-between"
                 onClick={() => navigate('/garage/1')}
               >
                 <div className="relative h-44 bg-gray-50 border-b border-gray-100">
@@ -214,13 +214,13 @@ const Home = () => {
                       <span className="line-clamp-1">{item.garage}</span>
                     </div>
                   </div>
-
+ 
                   {/* Detailing attributes */}
                   <div className="grid grid-cols-2 gap-2 text-[10px] text-gray-500 font-semibold border-y border-gray-100 py-2">
                     <div>⏱ {item.hours}</div>
                     <div>📦 {item.parts}</div>
                   </div>
-
+ 
                   <div className="flex items-center gap-1.5 text-xs">
                     <div className="flex items-center text-blue-650 font-bold bg-blue-50 px-2.5 py-0.5 rounded-none border border-blue-100">
                       <Star className="h-3.5 w-3.5 fill-current mr-0.5 text-blue-600" />
@@ -228,13 +228,13 @@ const Home = () => {
                     </div>
                     <span className="text-gray-400">({item.reviews} reviews)</span>
                   </div>
-
+ 
                   <div className="flex justify-between items-center pt-4 border-t border-gray-100">
                     <div className="flex flex-col">
                       <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Est. Price</span>
                       <span className="font-extrabold text-base text-gray-900">${item.price}</span>
                     </div>
-                    <div className="bg-gray-55 group-hover:bg-blue-600 text-gray-400 group-hover:text-white p-2.5 rounded-none transition-all border border-gray-100">
+                    <div className="bg-slate-50 group-hover:bg-blue-600 text-gray-400 group-hover:text-white p-2.5 rounded-none transition-all border border-gray-200">
                       <ArrowRight className="h-4 w-4" />
                     </div>
                   </div>
@@ -246,7 +246,7 @@ const Home = () => {
       </section>
 
       {/* Trust Verification Panel - Centered details & sharp boxes */}
-      <section className="py-24 px-4 sm:px-6 lg:px-8 bg-gray-50 border-t border-gray-150 flex flex-col items-center relative">
+      <section className="py-24 px-4 sm:px-6 lg:px-8 bg-blue-50/20 border-t border-blue-100/30 flex flex-col items-center relative">
         <div className="absolute inset-0 bg-[linear-gradient(to_right,#e2e8f0_1px,transparent_1px)] [background-size:40px] pointer-events-none opacity-30" />
         
         <div className="max-w-7xl w-full relative z-10">
@@ -266,7 +266,7 @@ const Home = () => {
               </p>
               
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 pt-4 text-left w-full">
-                <div className="flex items-start space-x-3 bg-white p-4 border border-gray-150 shadow-sm rounded-none">
+                <div className="flex items-start space-x-3 bg-white p-4 border border-blue-100/60 shadow-sm rounded-none">
                   <div className="bg-blue-50 p-2.5 rounded-none border border-blue-100 text-blue-600 shrink-0">
                     <TrendingUp className="h-4.5 w-4.5" />
                   </div>
@@ -275,7 +275,7 @@ const Home = () => {
                     <p className="text-[11px] text-gray-550 leading-relaxed">Quotes are systematically checked against regional database averages.</p>
                   </div>
                 </div>
-                <div className="flex items-start space-x-3 bg-white p-4 border border-gray-150 shadow-sm rounded-none">
+                <div className="flex items-start space-x-3 bg-white p-4 border border-blue-100/60 shadow-sm rounded-none">
                   <div className="bg-blue-50 p-2.5 rounded-none border border-blue-100 text-blue-600 shrink-0">
                     <CheckCircle2 className="h-4.5 w-4.5" />
                   </div>
@@ -288,7 +288,7 @@ const Home = () => {
             </div>
 
             <div className="lg:col-span-6 w-full flex justify-center">
-              <div className="bg-white p-8 rounded-none border border-gray-200 shadow-lg max-w-md w-full relative">
+              <div className="bg-white p-8 rounded-none border border-blue-200/60 shadow-[0_15px_40px_rgba(37,99,235,0.04)] max-w-md w-full relative">
                 <div className="absolute top-0 left-0 w-full h-1 bg-blue-600" />
                 
                 <div className="flex items-center justify-between mb-8 pb-4 border-b border-gray-100">
@@ -313,14 +313,14 @@ const Home = () => {
                     { label: 'Accreditation Checks', status: 'Passed', details: 'Accredited and vetted by regional partner boards.' },
                     { label: 'Quoting Value Scanner', status: 'Verified', details: 'Quote margins fall strictly within optimal guidelines.' },
                   ].map((check, i) => (
-                    <div key={i} className="p-4 bg-gray-50 border border-gray-150 rounded-none space-y-2">
+                    <div key={i} className="p-4 bg-white border border-blue-100/50 rounded-none space-y-2">
                       <div className="flex items-center justify-between">
                         <span className="text-xs font-bold text-gray-700">{check.label}</span>
                         <span className="text-[9px] font-black px-2.5 py-0.5 rounded-none bg-blue-50 text-blue-600 border border-blue-100 uppercase">
                           {check.status}
                         </span>
                       </div>
-                      <p className="text-[10px] text-gray-400 leading-relaxed">{check.details}</p>
+                      <p className="text-[10px] text-gray-450 leading-relaxed">{check.details}</p>
                     </div>
                   ))}
                 </div>
@@ -332,7 +332,7 @@ const Home = () => {
       </section>
 
       {/* Member Privileges Panel */}
-      <section className="py-24 px-4 sm:px-6 lg:px-8 bg-white flex flex-col items-center">
+      <section className="py-24 px-4 sm:px-6 lg:px-8 bg-[#f2f6fc] border-t border-blue-100/40 flex flex-col items-center">
         <div className="max-w-7xl w-full space-y-12 text-center flex flex-col items-center">
           
           <div className="max-w-sm mx-auto space-y-1">
@@ -344,10 +344,10 @@ const Home = () => {
             {promoCards.map((card, i) => {
               const Icon = card.icon;
               return (
-                <div key={i} className="p-8 rounded-none border border-gray-200 flex flex-col justify-between hover:border-blue-300 hover:shadow-md transition-all bg-white relative">
+                <div key={i} className="p-8 rounded-none border border-blue-100/60 flex flex-col justify-between hover:border-blue-600 hover:shadow-md transition-all bg-white relative">
                   <div className="space-y-6">
                     <div className="flex items-center justify-between">
-                      <span className="bg-blue-50 border border-blue-100 text-blue-650 text-[10px] font-black px-3 py-1 rounded-none uppercase tracking-wider">
+                      <span className="bg-blue-50 border border-blue-100 text-blue-655 text-[10px] font-black px-3 py-1 rounded-none uppercase tracking-wider">
                         {card.badge}
                       </span>
                     </div>
@@ -387,19 +387,19 @@ const Home = () => {
           </div>
           
           {/* Static promotion banner */}
-          <div className="bg-blue-50 border border-blue-100 rounded-none p-8 flex flex-col md:flex-row justify-between items-center gap-6 w-full text-left">
+          <div className="bg-[#003580] border border-blue-900 rounded-none p-8 flex flex-col md:flex-row justify-between items-center gap-6 w-full text-left text-white shadow-lg">
             <div className="flex items-center gap-4">
-              <div className="bg-white p-3 rounded-none border border-blue-100 text-blue-655 shrink-0">
-                <BellRing className="h-5 w-5 text-blue-600 animate-bounce" />
+              <div className="bg-blue-900/50 p-3 rounded-none border border-blue-700/80 text-blue-200 shrink-0">
+                <BellRing className="h-5 w-5 text-blue-300 animate-bounce" />
               </div>
               <div>
-                <h4 className="font-extrabold text-gray-900 text-sm">Configure your Carmerica Digital Garage</h4>
-                <p className="text-xs text-gray-550 mt-1">Input vehicle details, activate diagnostic scanners, and verify quotes instantly.</p>
+                <h4 className="font-extrabold text-white text-sm">Configure your Carmerica Digital Garage</h4>
+                <p className="text-xs text-blue-100 mt-1">Input vehicle details, activate diagnostic scanners, and verify quotes instantly.</p>
               </div>
             </div>
             <button
               onClick={() => navigate('/login')}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-none text-xs font-bold uppercase transition-all shrink-0 cursor-pointer shadow-sm tracking-wider"
+              className="bg-white hover:bg-blue-50 text-[#003580] px-6 py-3 rounded-none text-xs font-bold uppercase transition-all shrink-0 cursor-pointer shadow-sm tracking-wider"
             >
               Configure Garage
             </button>
