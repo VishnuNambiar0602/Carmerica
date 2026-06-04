@@ -241,7 +241,7 @@ const GarageDetails = () => {
                       </span>
                       <div className="text-right">
                         <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Save</p>
-                        <p className="text-xl font-bold text-green-400">AED {bundle.savings}</p>
+                        <p className="text-xl font-bold text-green-400">${bundle.savings}</p>
                       </div>
                     </div>
                     <h3 className="text-xl font-bold mb-4">{bundle.name}</h3>
@@ -254,8 +254,8 @@ const GarageDetails = () => {
                     </ul>
                     <div className="flex items-center justify-between pt-6 border-t border-white/10">
                       <div>
-                        <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest line-through">AED {bundle.originalPrice}</p>
-                        <p className="text-2xl font-bold">AED {bundle.price}</p>
+                        <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest line-through">${bundle.originalPrice}</p>
+                        <p className="text-2xl font-bold">${bundle.price}</p>
                       </div>
                       <button className="bg-white text-gray-900 px-6 py-3 rounded-xl font-bold text-sm hover:bg-red-600 hover:text-white transition-all active:scale-95">
                         Add Bundle
@@ -304,8 +304,8 @@ const GarageDetails = () => {
                     </div>
                     <div className="text-left md:text-right">
                       <div className="flex items-center md:justify-end space-x-2">
-                        <span className="text-sm text-gray-400 line-through font-medium">AED {service.marketPrice}</span>
-                        <span className="text-2xl font-bold text-gray-900">AED {service.price}</span>
+                        <span className="text-sm text-gray-400 line-through font-medium">${service.marketPrice}</span>
+                        <span className="text-2xl font-bold text-gray-900">${service.price}</span>
                       </div>
                       <div className="flex items-center md:justify-end space-x-1 text-green-600 text-[10px] font-bold uppercase tracking-widest mt-1">
                         <TrendingDown className="h-3 w-3" />
@@ -416,7 +416,7 @@ const GarageDetails = () => {
               <div className="mb-8 p-6 bg-gray-900 rounded-3xl text-white shadow-xl">
                 <div className="flex justify-between items-center mb-2">
                   <span className="text-sm font-bold">{garage.services.find(s => s.id === selectedService)?.name}</span>
-                  <span className="text-xl font-bold">AED {garage.services.find(s => s.id === selectedService)?.price}</span>
+                  <span className="text-xl font-bold">${garage.services.find(s => s.id === selectedService)?.price}</span>
                 </div>
                 <div className="flex items-center text-xs text-gray-400">
                   <Clock className="h-3 w-3 mr-1.5" />
@@ -481,7 +481,7 @@ const GarageDetails = () => {
                       <Star className="h-3 w-3 fill-current mr-1" />
                       4.7 (850 reviews)
                     </div>
-                    <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-1">Starts from AED 299</p>
+                    <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-1">Starts from $299</p>
                   </div>
                 </div>
               ))}

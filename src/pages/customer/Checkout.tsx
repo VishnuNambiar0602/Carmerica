@@ -396,13 +396,13 @@ const Checkout = () => {
                   <Zap className="h-6 w-6 text-yellow-400 fill-current" />
                 </div>
                 <div>
-                  <h3 className="text-xl font-bold">AI Smart Bundle: Save AED 120</h3>
+                  <h3 className="text-xl font-bold">AI Smart Bundle: Save $120</h3>
                   <p className="text-white/80 text-sm">Based on your car's mileage, we recommend adding an AC Filter & Sanitization.</p>
                 </div>
               </div>
               <div className="flex flex-col md:flex-row items-center gap-4">
                 <button className="w-full md:w-auto bg-white text-red-600 px-8 py-4 rounded-2xl font-bold text-sm hover:bg-gray-100 transition-all active:scale-95">
-                  Add to Booking (+ AED 180)
+                  Add to Booking (+ $180)
                 </button>
                 <button className="w-full md:w-auto bg-red-700 text-white px-8 py-4 rounded-2xl font-bold text-sm hover:bg-red-800 transition-all">
                   No thanks, just the service
@@ -918,7 +918,7 @@ const Checkout = () => {
                   <div className="flex justify-between items-center">
                     <span className="text-sm font-bold text-gray-500">Service Price</span>
                     <div className="text-right">
-                      <span className="text-sm font-bold text-gray-900">AED {servicePrice}</span>
+                      <span className="text-sm font-bold text-gray-900">${servicePrice}</span>
                       <div className="flex items-center text-[10px] font-bold text-green-600 uppercase tracking-widest">
                         <TrendingDown className="h-3 w-3 mr-1" /> AI Price Verified
                       </div>
@@ -960,13 +960,13 @@ const Checkout = () => {
                   {promoResult && (
                     <div className="flex justify-between items-center">
                       <span className="text-sm font-bold text-green-600">Promo Discount</span>
-                      <span className="text-sm font-bold text-green-600">- AED {discount}</span>
+                      <span className="text-sm font-bold text-green-600">- ${discount}</span>
                     </div>
                   )}
 
                   <div className="flex justify-between items-center">
                     <span className="text-sm font-bold text-gray-500">Taxes (5% VAT)</span>
-                    <span className="text-sm font-bold text-gray-900">AED {tax.toFixed(2)}</span>
+                    <span className="text-sm font-bold text-gray-900">${tax.toFixed(2)}</span>
                   </div>
 
                   <div className="flex justify-between items-center pt-6 border-t border-gray-50">
@@ -974,14 +974,14 @@ const Checkout = () => {
                     <div className="text-right">
                       {promoResult ? (
                         <>
-                          <span className="text-sm line-through text-gray-400 mr-2">AED {((servicePrice + (Math.round(servicePrice * 0.05 * 100) / 100))).toFixed(2)}</span>
-                          <span className="text-2xl font-bold text-green-600">AED {total.toFixed(2)}</span>
+                          <span className="text-sm line-through text-gray-400 mr-2">${((servicePrice + (Math.round(servicePrice * 0.05 * 100) / 100))).toFixed(2)}</span>
+                          <span className="text-2xl font-bold text-green-600">${total.toFixed(2)}</span>
                         </>
                       ) : (
-                        <span className="text-2xl font-bold text-red-600">AED {total.toFixed(2)}</span>
+                        <span className="text-2xl font-bold text-red-600">${total.toFixed(2)}</span>
                       )}
                       {hasSavings && (
-                        <p className="text-[10px] text-green-600 font-bold uppercase tracking-widest mt-1">Saved AED {savings.toFixed(2)} vs Market</p>
+                        <p className="text-[10px] text-green-600 font-bold uppercase tracking-widest mt-1">Saved ${savings.toFixed(2)} vs Market</p>
                       )}
                     </div>
                   </div>

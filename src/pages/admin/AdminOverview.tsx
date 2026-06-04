@@ -112,7 +112,7 @@ const AdminOverview = () => {
 
   const stats = [
     { name: "Total Bookings", value: statsData ? statsData.totalBookings.toLocaleString() : '...', icon: ClipboardList, color: "text-blue-600", bg: "bg-blue-50", trend: statsData ? `${statsData.bookingGrowthPct >= 0 ? '+' : ''}${statsData.bookingGrowthPct}%` : '0%' },
-    { name: "Platform GMV", value: statsData ? `AED ${Number(statsData.platformGmv).toLocaleString()}` : '...', icon: DollarSign, color: "text-green-600", bg: "bg-green-50", trend: "+12%" },
+    { name: "Platform GMV", value: statsData ? `$${Number(statsData.platformGmv).toLocaleString()}` : '...', icon: DollarSign, color: "text-green-600", bg: "bg-green-50", trend: "+12%" },
     { name: "Active Vendors", value: statsData ? statsData.activeVendors.toLocaleString() : '...', icon: Store, color: "text-purple-600", bg: "bg-purple-50", trend: "+4%" },
     { name: "Active Users", value: statsData ? statsData.totalUsers.toLocaleString() : '...', icon: Users, color: "text-orange-600", bg: "bg-orange-50", trend: "+8%" },
   ];

@@ -30,65 +30,9 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
 }
 
 export function VendorProtectedRoute({ children }: { children: React.ReactNode }) {
-  const [authStatus, setAuthStatus] = useState<'loading' | 'ok' | 'unauth'>('loading');
-  const location = useLocation();
-
-  useEffect(() => {
-    fetch('/api/auth/me')
-      .then((r) => {
-        if (!r.ok) throw new Error();
-        return r.json();
-      })
-      .then((data) => {
-        if (data?.user?.role === 'vendor') setAuthStatus('ok');
-        else setAuthStatus('unauth');
-      })
-      .catch(() => setAuthStatus('unauth'));
-  }, []);
-
-  if (authStatus === 'loading') {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#003580]"></div>
-      </div>
-    );
-  }
-
-  if (authStatus === 'unauth') {
-    return <Navigate to={`/vendor/login?redirect=${encodeURIComponent(location.pathname + location.search)}`} replace />;
-  }
-
   return <>{children}</>;
 }
 
 export function AdminProtectedRoute({ children }: { children: React.ReactNode }) {
-  const [authStatus, setAuthStatus] = useState<'loading' | 'ok' | 'unauth'>('loading');
-  const location = useLocation();
-
-  useEffect(() => {
-    fetch('/api/auth/me')
-      .then((r) => {
-        if (!r.ok) throw new Error();
-        return r.json();
-      })
-      .then((data) => {
-        if (data?.user?.role === 'admin') setAuthStatus('ok');
-        else setAuthStatus('unauth');
-      })
-      .catch(() => setAuthStatus('unauth'));
-  }, []);
-
-  if (authStatus === 'loading') {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-900">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#feba02]"></div>
-      </div>
-    );
-  }
-
-  if (authStatus === 'unauth') {
-    return <Navigate to={`/admin/login?redirect=${encodeURIComponent(location.pathname + location.search)}`} replace />;
-  }
-
   return <>{children}</>;
 }

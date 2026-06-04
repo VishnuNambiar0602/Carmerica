@@ -578,7 +578,7 @@ const SearchResults = () => {
                           <p className="text-xs text-gray-500 flex items-center mt-1">
                             <MapPin className="h-3 w-3 mr-1" /> {garage.location}
                           </p>
-                          <p className="text-xs font-bold text-red-600 mt-1">AED {garage.price}</p>
+                          <p className="text-xs font-bold text-red-600 mt-1">${garage.price}</p>
                           <button
                             onClick={() => navigate(`/garage/${garage.id}`)}
                             className="mt-2 w-full text-center text-xs bg-gray-900 hover:bg-red-600 text-white py-1.5 rounded-lg font-bold transition-colors"
@@ -676,13 +676,13 @@ const SearchResults = () => {
                             <TrendingDown className="h-4 w-4 text-blue-600" />
                             <span className="text-xs font-bold text-blue-900 uppercase tracking-wider">AI Price Intelligence</span>
                           </div>
-                          <span className="text-xs font-bold text-green-600">Save AED {garage.marketPrice - garage.price}</span>
+                          <span className="text-xs font-bold text-green-600">Save ${garage.marketPrice - garage.price}</span>
                         </div>
                         <div className="mt-2 flex items-center space-x-4">
                           <div className="grow h-1.5 bg-gray-200 rounded-full overflow-hidden">
                             <div className="h-full bg-blue-600 rounded-full" style={{ width: '70%' }} />
                           </div>
-                          <span className="text-[10px] font-bold text-gray-400">Market: AED {garage.marketPrice}</span>
+                          <span className="text-[10px] font-bold text-gray-400">Market: ${garage.marketPrice}</span>
                         </div>
                       </div>
                     </div>
@@ -694,7 +694,7 @@ const SearchResults = () => {
                       <div className="flex items-center space-x-6">
                         <div className="text-right">
                           <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Starts from</p>
-                          <p className="text-2xl font-bold text-gray-900">AED {garage.price}</p>
+                          <p className="text-2xl font-bold text-gray-900">${garage.price}</p>
                         </div>
                         <button className="bg-gray-900 text-white px-8 py-3.5 rounded-2xl font-bold text-sm hover:bg-red-600 transition-all active:scale-95 shadow-xl shadow-gray-900/10"
                           onClick={(e) => {

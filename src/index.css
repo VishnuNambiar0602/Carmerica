@@ -61,19 +61,19 @@ body {
 
 @theme {
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
-  --color-booking-blue: #003580;
-  --color-booking-yellow: #febb02;
-  --color-booking-light-blue: #006ce4;
+  --color-booking-blue: #2563eb;
+  --color-booking-yellow: #3b82f6;
+  --color-booking-light-blue: #1d4ed8;
   
   /* Modern UI Palette */
-  --color-brand-primary: #003580;
-  --color-brand-secondary: #febb02;
-  --color-brand-accent: #006ce4;
-  --color-surface-50: #f8fafc;
-  --color-surface-100: #f1f5f9;
-  --color-surface-200: #e2e8f0;
-  --color-surface-800: #1e293b;
-  --color-surface-900: #0f172a;
+  --color-brand-primary: #2563eb;
+  --color-brand-secondary: #1d4ed8;
+  --color-brand-accent: #3b82f6;
+  --color-surface-50: #ffffff;
+  --color-surface-100: #f8fafc;
+  --color-surface-200: #f1f5f9;
+  --color-surface-800: #2563eb;
+  --color-surface-900: #1d4ed8;
 }
 
 @layer base {

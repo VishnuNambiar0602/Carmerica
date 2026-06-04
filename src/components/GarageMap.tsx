@@ -214,9 +214,9 @@ export default function GarageMap({ onClose, onGarageSelect }: GarageMapProps) {
                           </p>
                         )}
                         <button
-                          onClick={() => {
-                            setSelectedGarageForDirections(garage);
-                            setShowDirections(true);
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            window.open(`https://www.google.com/maps/search/?api=1&query=${garage.lat},${garage.lng}`, '_blank');
                           }}
                           className="w-full mt-3 bg-emerald-600 text-white py-2 rounded hover:bg-emerald-700 transition text-sm font-semibold flex items-center justify-center gap-2"
                         >
@@ -302,8 +302,7 @@ export default function GarageMap({ onClose, onGarageSelect }: GarageMapProps) {
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      setSelectedGarageForDirections(garage);
-                      setShowDirections(true);
+                      window.open(`https://www.google.com/maps/search/?api=1&query=${garage.lat},${garage.lng}`, '_blank');
                     }}
                     className="flex-1 text-sm bg-emerald-600 text-white py-2 rounded hover:bg-emerald-700 transition font-semibold flex items-center justify-center gap-1"
                   >

@@ -49,67 +49,64 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-[calc(100vh-64px)] flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8 bg-white p-8 rounded-xl shadow-sm border border-gray-200">
+    <div className="min-h-[calc(100vh-64px)] flex items-center justify-center bg-slate-50 py-16 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-md w-full space-y-6 bg-white p-8 rounded-none border border-gray-150 shadow-sm relative z-10">
         <div className="text-center">
           <div className="flex justify-center">
-            <div className="bg-[#003580] p-3 rounded-xl">
-              <Car className="h-8 w-8 text-[#feba02]" />
+            <div className="bg-blue-50 p-2.5 rounded-none border border-blue-100 text-blue-650">
+              <Car className="h-6 w-6 text-blue-600" />
             </div>
           </div>
-          <h2 className="mt-6 text-3xl font-bold text-gray-900 tracking-tight">
-            {isLogin ? 'Sign in to your account' : 'Create your account'}
+          <h2 className="mt-4 text-2xl font-bold text-gray-900 tracking-tight">
+            {isLogin ? 'Welcome Back' : 'Create Account'}
           </h2>
-          <p className="mt-2 text-sm text-gray-600">
-            {isLogin ? "Don't have an account? " : "Already have an account? "}
+          <p className="mt-1.5 text-xs text-gray-500">
+            {isLogin ? "New to Carmerica? " : "Already have an account? "}
             <button
               onClick={() => { setIsLogin(!isLogin); setError(''); }}
-              className="font-bold text-[#0071c2] hover:underline focus:outline-none"
+              className="font-bold text-blue-600 hover:text-blue-700 focus:outline-none transition-colors cursor-pointer"
             >
-              {isLogin ? 'Register here' : 'Sign in here'}
+              {isLogin ? 'Register now' : 'Sign in instead'}
             </button>
           </p>
         </div>
 
         {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 text-sm p-4 rounded-lg">
+          <div className="bg-red-50 border border-red-200 text-red-700 text-xs p-3.5 rounded-none">
             {error}
           </div>
         )}
 
-        <div className="mt-8 space-y-6">
+        <div className="space-y-5">
           <div className="grid grid-cols-2 gap-3">
-            <button className="flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors">
-              <Chrome className="h-5 w-5 mr-2 text-red-500" />
+            <button className="flex items-center justify-center px-4 py-2.5 border border-gray-200 rounded-none text-xs font-bold text-gray-700 bg-white hover:bg-gray-50 transition-all cursor-pointer">
+              <Chrome className="h-4 w-4 mr-2 text-red-500" />
               Google
             </button>
-            <button className="flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors">
-              <Facebook className="h-5 w-5 mr-2 text-blue-600" />
+            <button className="flex items-center justify-center px-4 py-2.5 border border-gray-200 rounded-none text-xs font-bold text-gray-700 bg-white hover:bg-gray-50 transition-all cursor-pointer">
+              <Facebook className="h-4 w-4 mr-2 text-blue-600" />
               Facebook
             </button>
           </div>
 
           <div className="relative">
             <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-gray-300"></div>
+              <div className="w-full border-t border-gray-150"></div>
             </div>
-            <div className="relative flex justify-center text-sm">
-              <span className="px-2 bg-white text-gray-500 uppercase tracking-wider text-xs font-bold">Or continue with email</span>
+            <div className="relative flex justify-center text-xs">
+              <span className="px-3 bg-white text-gray-400 uppercase tracking-widest text-[9px] font-bold">Or use email</span>
             </div>
           </div>
 
-          <form className="mt-8 space-y-4" onSubmit={handleSubmit}>
+          <form className="space-y-4" onSubmit={handleSubmit}>
             {!isLogin && (
-              <div className="space-y-1">
-                <label className="text-sm font-bold text-gray-700">Full Name</label>
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Full Name</label>
                 <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <Mail className="h-5 w-5 text-gray-400" />
-                  </div>
                   <input
                     type="text"
                     required
-                    className="appearance-none block w-full pl-10 px-3 py-3 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-[#0071c2] focus:border-[#0071c2] sm:text-sm"
+                    className="block w-full bg-white border border-gray-200 rounded-none px-4 py-2.5 text-xs text-gray-905 placeholder-gray-400 focus:outline-none focus:border-blue-500 transition-all font-semibold"
                     placeholder="John Doe"
                     value={formData.fullName}
                     onChange={(e) => setFormData({...formData, fullName: e.target.value})}
@@ -118,91 +115,82 @@ const Login = () => {
               </div>
             )}
 
-            <div className="space-y-1">
-              <label className="text-sm font-bold text-gray-700">Email address</label>
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Email Address</label>
               <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Mail className="h-5 w-5 text-gray-400" />
-                </div>
                 <input
                   type="email"
                   required
-                  className="appearance-none block w-full pl-10 px-3 py-3 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-[#0071c2] focus:border-[#0071c2] sm:text-sm"
-                  placeholder="you@example.com"
+                  className="block w-full bg-white border border-gray-200 rounded-none px-4 py-2.5 text-xs text-gray-905 placeholder-gray-400 focus:outline-none focus:border-blue-500 transition-all font-semibold"
+                  placeholder="you@domain.com"
                   value={formData.email}
                   onChange={(e) => setFormData({...formData, email: e.target.value})}
                 />
               </div>
             </div>
 
-            <div className="space-y-1">
-              <label className="text-sm font-bold text-gray-700">Password</label>
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Password</label>
               <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Lock className="h-5 w-5 text-gray-400" />
-                </div>
                 <input
                   type={showPassword ? 'text' : 'password'}
                   required
-                  className="appearance-none block w-full pl-10 pr-10 px-3 py-3 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-[#0071c2] focus:border-[#0071c2] sm:text-sm"
+                  className="block w-full bg-white border border-gray-200 rounded-none pl-4 pr-10 py-2.5 text-xs text-gray-905 placeholder-gray-400 focus:outline-none focus:border-blue-500 transition-all font-semibold"
                   placeholder="••••••••"
                   value={formData.password}
                   onChange={(e) => setFormData({...formData, password: e.target.value})}
                 />
                 <button
                   type="button"
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                  className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-gray-400 hover:text-gray-650 cursor-pointer"
                   onClick={() => setShowPassword(!showPassword)}
                 >
                   {showPassword ? (
-                    <EyeOff className="h-5 w-5 text-gray-400 hover:text-gray-600" />
+                    <EyeOff className="h-4 w-4" />
                   ) : (
-                    <Eye className="h-5 w-5 text-gray-400 hover:text-gray-600" />
+                    <Eye className="h-4 w-4" />
                   )}
                 </button>
               </div>
             </div>
 
             {isLogin && (
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between pt-0.5">
                 <div className="flex items-center">
                   <input
                     id="remember-me"
                     name="remember-me"
                     type="checkbox"
-                    className="h-4 w-4 text-[#0071c2] focus:ring-[#0071c2] border-gray-300 rounded"
+                    className="h-3.5 w-3.5 border-gray-200 text-blue-600 focus:ring-blue-500 rounded-none cursor-pointer"
                   />
-                  <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-700">
-                    Remember me
+                  <label htmlFor="remember-me" className="ml-1.5 block text-xs text-gray-500 font-medium">
+                    Keep me signed in
                   </label>
                 </div>
-                <div className="text-sm">
-                  <Link to="/forgot-password" className="font-bold text-[#0071c2] hover:underline">
-                    Forgot password?
+                <div className="text-xs font-bold">
+                  <Link to="/forgot-password" className="text-blue-600 hover:text-blue-700 transition-colors">
+                    Forgot details?
                   </Link>
                 </div>
               </div>
             )}
 
-            <div>
+            <div className="pt-1.5">
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-bold text-white bg-[#0071c2] hover:bg-[#005999] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#0071c2] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full flex justify-center py-3 px-4 border border-transparent rounded-none text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 focus:outline-none transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-sm cursor-pointer"
               >
-                {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : (isLogin ? 'Sign in' : 'Create account')}
+                {loading ? <Loader2 className="h-4.5 w-4.5 animate-spin" /> : (isLogin ? 'Sign in' : 'Create account')}
               </button>
             </div>
           </form>
 
-          <div className="mt-6">
-            <div className="bg-blue-50 p-4 rounded-lg border border-blue-100">
-              <p className="text-xs text-[#003580] leading-relaxed">
-                By signing in or creating an account, you agree with our{' '}
-                <span className="font-bold underline cursor-pointer">Terms & Conditions</span> and{' '}
-                <span className="font-bold underline cursor-pointer">Privacy Statement</span>.
-              </p>
-            </div>
+          <div className="mt-4 pt-4 border-t border-gray-100 text-center">
+            <p className="text-[10px] text-gray-450 leading-relaxed">
+              By logging in, you agree to our{' '}
+              <span className="font-bold underline cursor-pointer text-gray-550">Terms of Service</span>.
+            </p>
           </div>
         </div>
       </div>

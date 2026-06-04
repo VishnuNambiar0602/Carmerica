@@ -31,7 +31,7 @@ import { cn } from '../../lib/utils';
 
 const stats = [
   { name: 'Bookings', value: '120', icon: ClipboardList, color: 'text-blue-600', bg: 'bg-blue-50' },
-  { name: 'Revenue', value: 'AED 24,300', icon: DollarSign, color: 'text-green-600', bg: 'bg-green-50' },
+  { name: 'Revenue', value: '$24,300', icon: DollarSign, color: 'text-green-600', bg: 'bg-green-50' },
   { name: 'Rating', value: '4.8', icon: Star, color: 'text-yellow-500', bg: 'bg-yellow-50' },
   { name: 'Pending', value: '8', icon: Clock, color: 'text-red-600', bg: 'bg-red-50' },
 ];
@@ -158,7 +158,7 @@ const VendorDashboard = () => {
               <div className="flex items-center gap-4 bg-white/5 border border-white/10 p-4 rounded-2xl">
                 <div>
                   <p className="text-[10px] font-bold text-gray-500 uppercase">Recommended Price</p>
-                  <p className="text-2xl font-black text-red-500">AED {aiInsight.suggestedPrice}</p>
+                  <p className="text-2xl font-black text-red-500">${aiInsight.suggestedPrice}</p>
                 </div>
                 <div className="h-10 w-px bg-white/10" />
                 <div>
@@ -213,7 +213,7 @@ const VendorDashboard = () => {
         {stats.map((stat, idx) => {
           const values = statsData ? [
             statsData.totalBookings,
-            `AED ${Number(statsData.monthlyRevenue || 0).toLocaleString()}`,
+            `$${Number(statsData.monthlyRevenue || 0).toLocaleString()}`,
             Number(statsData.avgRating || 0).toFixed(1),
             statsData.pending,
           ] : null;
@@ -299,10 +299,10 @@ const VendorDashboard = () => {
                   <div key={i} className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl border border-gray-100">
                     <div>
                       <p className="text-sm font-bold text-gray-900">{item.service}</p>
-                      <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Market Avg: AED {item.market}</p>
+                      <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Market Avg: ${item.market}</p>
                     </div>
                     <div className="text-right">
-                      <p className="text-sm font-bold text-gray-900">AED {item.current}</p>
+                      <p className="text-sm font-bold text-gray-900">${item.current}</p>
                       <div className={cn("flex items-center text-[10px] font-bold uppercase tracking-widest", item.trend === 'up' ? "text-green-600" : "text-red-600")}>
                         {item.trend === 'up' ? <ArrowUpRight className="h-3 w-3 mr-1" /> : <ArrowDownRight className="h-3 w-3 mr-1" />}
                         {item.trend === 'up' ? 'Underpriced' : 'Overpriced'}

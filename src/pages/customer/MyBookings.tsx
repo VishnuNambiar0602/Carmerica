@@ -147,11 +147,11 @@ const MyBookings = () => {
           </div>
           <div class="item">
             <span>${booking.service || 'General Service'}</span>
-            <span>AED ${booking.price}</span>
+            <span>$${booking.price}</span>
           </div>
           <div class="total">
             <span>Total Paid</span>
-            <span>AED ${booking.price}</span>
+            <span>$${booking.price}</span>
           </div>
         </div>
       </body>
@@ -296,10 +296,10 @@ const MyBookings = () => {
                     <div className="space-y-2">
                       <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Total Price</p>
                       <div className="flex items-center gap-2">
-                        <p className="text-lg font-bold text-gray-900">AED {booking.price}</p>
+                        <p className="text-lg font-bold text-gray-900">${booking.price}</p>
                         {booking.savings && (
                           <span className="text-[10px] font-bold text-green-600 bg-green-50 px-2 py-0.5 rounded-full uppercase tracking-widest">
-                            Saved AED {booking.savings}
+                            Saved ${booking.savings}
                           </span>
                         )}
                       </div>
@@ -434,7 +434,7 @@ const MyBookings = () => {
               </div>
               <div className="flex justify-between items-center py-3 border-b border-gray-50">
                 <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">Amount</span>
-                <span className="text-sm font-bold text-gray-900">AED {selectedBooking.price}</span>
+                <span className="text-sm font-bold text-gray-900">${selectedBooking.price}</span>
               </div>
               <div className="flex justify-between items-center py-3 border-b border-gray-50">
                 <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">Status</span>

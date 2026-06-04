@@ -314,7 +314,7 @@ export default function Profile() {
             <div className="grid grid-cols-3 gap-2 bg-gray-50 p-4 rounded-2xl mb-6 text-center">
               <div>
                 <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Spent</p>
-                <p className="text-sm font-black text-gray-900 mt-1">AED {totalSpend}</p>
+                <p className="text-sm font-black text-gray-900 mt-1">${totalSpend}</p>
               </div>
               <div className="border-l border-r border-gray-200">
                 <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Completed</p>
@@ -351,7 +351,7 @@ export default function Profile() {
                       )}>
                         {booking.status}
                       </span>
-                      <p className="font-bold text-gray-900 mt-1">AED {booking.amount}</p>
+                      <p className="font-bold text-gray-900 mt-1">${booking.amount}</p>
                     </div>
                   </div>
                 ))}
@@ -405,7 +405,7 @@ export default function Profile() {
                         <MapPin className="h-3 w-3 mr-1 text-gray-400" /> {cartItem.garageName}
                       </p>
                     </div>
-                    <span className="font-black text-gray-900 text-sm">AED {cartItem.price}</span>
+                    <span className="font-black text-gray-900 text-sm">${cartItem.price}</span>
                   </div>
                   <Link 
                     to={`/checkout?garageId=${cartItem.garageId}&serviceId=${cartItem.serviceId}`}
