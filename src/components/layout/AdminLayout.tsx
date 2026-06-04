@@ -74,45 +74,44 @@ const Sidebar = ({ isOpen, setIsOpen }: { isOpen: boolean; setIsOpen: (val: bool
       )}
       
       <aside className={cn(
-        "fixed md:sticky top-0 left-0 h-screen w-64 bg-slate-950 border-r border-slate-905/80 text-white z-50 transition-transform duration-300 ease-in-out md:translate-x-0",
+        "fixed md:sticky top-0 left-0 h-screen w-64 bg-[#003580] border-r border-blue-900 text-white z-50 transition-transform duration-300 ease-in-out md:translate-x-0 rounded-none",
         isOpen ? "translate-x-0" : "-translate-x-full"
       )}>
         <div className="flex flex-col h-full">
           <div className="p-6 flex items-center justify-between">
-            <Link to="/admin/overview" className="flex items-center space-x-3 group">
-              <div className="bg-blue-600/10 p-2 rounded-2xl border border-blue-500/20">
-                <ShieldCheck className="h-6 w-6 text-blue-400" />
-              </div>
-              <span className="text-xl font-extrabold tracking-tight bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent">AdminPanel</span>
+            <Link to="/admin/overview" className="flex items-center space-x-2 group">
+              <ShieldCheck className="h-5 w-5 text-blue-200" />
+              <span className="text-lg font-black tracking-tight text-white">AdminPanel</span>
             </Link>
-            <button className="md:hidden p-2.5 rounded-xl hover:bg-slate-900" onClick={() => setIsOpen(false)}>
-              <X className="h-6 w-6 text-slate-400" />
+            <button className="md:hidden p-2 rounded-none hover:bg-blue-900 text-blue-100 hover:text-white" onClick={() => setIsOpen(false)}>
+              <X className="h-5 w-5" />
             </button>
           </div>
 
-          <nav className="flex-grow px-4 space-y-1.5 overflow-y-auto custom-scrollbar">
+          <nav className="flex-grow px-3 space-y-1 overflow-y-auto custom-scrollbar">
             {menuItems.map((item) => {
               const isActive = location.pathname === item.path;
+              const Icon = item.icon;
               return (
                 <Link
                   key={item.name}
                   to={item.path}
                   className={cn(
-                    "flex items-center space-x-3 px-4 py-3 rounded-2xl text-sm font-semibold transition-all border border-transparent",
+                    "flex items-center space-x-3 px-3 py-2 rounded-none text-[10px] font-bold uppercase tracking-wider transition-all border border-transparent",
                     isActive 
-                      ? "bg-blue-600/10 text-blue-400 border-blue-500/20 shadow-sm" 
-                      : "text-slate-400 hover:bg-slate-900 hover:text-white"
+                      ? "bg-blue-950 text-white border-l-2 border-blue-400" 
+                      : "text-blue-100 hover:bg-blue-800/40 hover:text-white"
                   )}
                   onClick={() => setIsOpen(false)}
                 >
-                  <item.icon className={cn("h-4 w-4", isActive ? "text-blue-400" : "text-slate-400")} />
+                  <Icon className="h-3.5 w-3.5 text-blue-300" />
                   <span>{item.name}</span>
                 </Link>
               );
             })}
           </nav>
 
-          <div className="p-4 border-t border-slate-900">
+          <div className="p-4 border-t border-blue-900">
             {isAuthenticated() ? (
               <button 
                 onClick={() => {
@@ -120,17 +119,17 @@ const Sidebar = ({ isOpen, setIsOpen }: { isOpen: boolean; setIsOpen: (val: bool
                   localStorage.removeItem('user');
                   window.location.href = '/admin/login';
                 }}
-                className="flex items-center space-x-3 w-full px-4 py-3 rounded-2xl text-sm font-semibold text-red-400 hover:bg-red-500/5 hover:text-red-300 transition-all border border-transparent"
+                className="flex items-center space-x-3 w-full px-3 py-2 rounded-none text-[10px] font-bold uppercase tracking-wider text-red-200 hover:text-white bg-red-950/40 border border-red-900/50 hover:bg-red-900/50 transition-all"
               >
-                <LogOut className="h-4 w-4 text-red-400" />
+                <LogOut className="h-3.5 w-3.5 text-red-300" />
                 <span>Log Out</span>
               </button>
             ) : (
               <Link 
                 to="/admin/login" 
-                className="flex items-center space-x-3 px-4 py-3 rounded-2xl text-sm font-semibold text-slate-400 hover:bg-slate-900 hover:text-white transition-all border border-transparent"
+                className="flex items-center space-x-3 px-3 py-2 rounded-none text-[10px] font-bold uppercase tracking-wider text-blue-100 hover:bg-blue-800/40 hover:text-white transition-all border border-transparent"
               >
-                <LogOut className="h-4 w-4 text-slate-400" />
+                <LogOut className="h-3.5 w-3.5 text-blue-300" />
                 <span>Log Out</span>
               </Link>
             )}
@@ -150,18 +149,18 @@ const Header = ({ setIsOpen }: { setIsOpen: (val: boolean) => void }) => {
   const user = getAdminUser();
 
   return (
-    <header className="bg-slate-900/20 backdrop-blur-md border-b border-slate-900/80 h-20 sticky top-0 z-30 flex items-center justify-between px-4 md:px-8 text-white">
+    <header className="bg-[#003580] border-b border-blue-900 h-16 sticky top-0 z-30 flex items-center justify-between px-4 md:px-8 text-white">
       <div className="flex items-center">
         <button 
-          className="md:hidden p-2.5 mr-2 rounded-xl text-slate-400 hover:bg-slate-900" 
+          className="md:hidden p-2 mr-2 rounded-none text-blue-100 hover:text-white hover:bg-blue-900" 
           onClick={() => setIsOpen(true)}
         >
-          <Menu className="h-6 w-6" />
+          <Menu className="h-5 w-5" />
         </button>
         {isAuthenticated() ? (
-          <h1 className="text-lg font-bold text-white hidden md:block">System Administration</h1>
+          <h1 className="text-sm font-bold uppercase tracking-wider text-white hidden md:block">System Administration</h1>
         ) : (
-          <Link to="/admin/login" className="text-lg font-bold text-white hidden md:block">
+          <Link to="/admin/login" className="text-sm font-bold uppercase tracking-wider text-white hidden md:block">
             AdminPanel
           </Link>
         )}
@@ -172,18 +171,18 @@ const Header = ({ setIsOpen }: { setIsOpen: (val: boolean) => void }) => {
           <NotificationBell userId={user?.id || 'admin-1'} role="admin" />
         )}
         {isAuthenticated() ? (
-          <div className="flex items-center space-x-3 border-l pl-4 border-slate-900">
+          <div className="flex items-center space-x-3 border-l pl-4 border-blue-900">
             <div className="text-right hidden sm:block">
-              <p className="text-sm font-semibold text-slate-200">{user?.full_name || 'Super Admin'}</p>
-              <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Access: Root</p>
+              <p className="text-[10px] font-bold uppercase tracking-wider text-white">{user?.full_name || 'Super Admin'}</p>
+              <p className="text-[9px] text-blue-200 font-bold uppercase tracking-widest">Access: Root</p>
             </div>
-            <div className="h-10 w-10 rounded-2xl bg-blue-600/10 text-blue-400 border border-blue-500/20 flex items-center justify-center font-bold text-sm">
+            <div className="h-9 w-9 rounded-none bg-blue-900/60 text-blue-200 border border-blue-800/60 flex items-center justify-center font-bold text-xs">
               {user?.full_name ? user.full_name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2) : 'SA'}
             </div>
           </div>
         ) : (
-          <div className="flex items-center space-x-3 border-l pl-4 border-slate-900">
-            <Link to="/admin/login" className="bg-blue-600 hover:bg-blue-500 text-white px-5 py-2.5 rounded-2xl text-sm font-bold shadow-md hover:shadow-lg transition-all">
+          <div className="flex items-center space-x-3 border-l pl-4 border-blue-900">
+            <Link to="/admin/login" className="bg-white hover:bg-blue-50 text-[#003580] px-3.5 py-1.5 rounded-none text-[10px] font-extrabold uppercase tracking-wider transition-all">
               Sign in
             </Link>
           </div>
@@ -197,7 +196,7 @@ export const AdminLayout = () => {
   const [isSidebarOpen, setIsSidebarOpen] = React.useState(false);
 
   return (
-    <div className="admin-portal flex min-h-screen bg-slate-950 text-slate-100">
+    <div className="admin-portal flex min-h-screen bg-slate-50 text-slate-900 font-sans">
       <Sidebar isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} />
       <div className="flex-grow flex flex-col">
         <Header setIsOpen={setIsSidebarOpen} />
