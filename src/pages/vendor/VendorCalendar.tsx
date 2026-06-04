@@ -270,7 +270,7 @@ const VendorCalendar = () => {
                                 <span className="text-[10px] bg-white border border-black px-1.5 py-0.5 font-bold uppercase">{apt.status}</span>
                               </div>
                               <p className="font-black opacity-90 truncate mt-0.5">{apt.service}</p>
-                              <div className="text-[9px] font-bold uppercase mt-1">AED {apt.amount}</div>
+                              <div className="text-[9px] font-bold uppercase mt-1">$ {apt.amount}</div>
                             </div>
                           ))}
                         </div>

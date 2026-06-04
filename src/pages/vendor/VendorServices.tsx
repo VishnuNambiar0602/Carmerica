@@ -312,7 +312,7 @@ const VendorServices = () => {
             </div>
             <h3 className="text-xs font-black text-gray-500 uppercase tracking-widest">Avg. Price</h3>
           </div>
-          <p className="text-3xl font-black text-gray-900">AED {stats.avgPrice}</p>
+          <p className="text-3xl font-black text-gray-900">$ {stats.avgPrice}</p>
         </div>
       </div>
 
@@ -378,7 +378,7 @@ const VendorServices = () => {
               <div className="flex justify-between items-end">
                 <div>
                   <p className="text-gray-500 text-xs font-bold uppercase">Recommended Price</p>
-                  <p className="text-3xl font-black text-gray-900">AED {recommendation.recommendedPrice || recommendation.suggestedPrice}</p>
+                  <p className="text-3xl font-black text-gray-900">$ {recommendation.recommendedPrice || recommendation.suggestedPrice}</p>
                 </div>
                 <div className="text-right">
                   <p className="text-gray-500 text-xs font-bold uppercase">Market Position</p>
@@ -461,7 +461,7 @@ const VendorServices = () => {
                       </span>
                     </td>
                     <td className="px-6 py-4 text-sm font-black text-gray-900 border-r-2 border-black">
-                      AED {service.price}
+                      $ {service.price}
                     </td>
                     <td className="px-6 py-4 text-sm font-bold text-gray-600 border-r-2 border-black">
                       {service.duration_minutes ? `${service.duration_minutes} mins` : service.duration || '60 mins'}
@@ -559,7 +559,7 @@ const VendorServices = () => {
                   </select>
                 </div>
                 <div>
-                  <label className="text-xs font-black text-gray-700 uppercase tracking-widest block">Price (AED) *</label>
+                  <label className="text-xs font-black text-gray-700 uppercase tracking-widest block">Price (USD) *</label>
                   <input 
                     type="number" 
                     min="0"

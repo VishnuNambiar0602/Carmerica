@@ -251,7 +251,7 @@ const VendorPromotions = () => {
             </div>
             <h3 className="text-xs font-black text-gray-500 uppercase tracking-widest">Revenue from Deals</h3>
           </div>
-          <p className="text-3xl font-black text-gray-900">AED {mockRevenue.toLocaleString()}</p>
+          <p className="text-3xl font-black text-gray-900">$ {mockRevenue.toLocaleString()}</p>
         </div>
       </div>
 
@@ -314,7 +314,7 @@ const VendorPromotions = () => {
                       <p className="text-sm font-black text-gray-900">
                         {promo.discount_type === 'percent' ? `${promo.discount_value}% Off` :
                          promo.discount_type === 'freebie' ? 'Free Service' :
-                         `AED ${promo.discount_value} Off`}
+                         `$ ${promo.discount_value} Off`}
                       </p>
                     </div>
                     <div className="bg-gray-50 border-2 border-black p-3 rounded-none shadow-[1.5px_1.5px_0px_0px_rgba(0,0,0,1)]">
@@ -405,7 +405,7 @@ const VendorPromotions = () => {
                     className="w-full p-3 border-2 border-black mt-1 text-sm outline-none focus:ring-2 focus:ring-[#003580] rounded-none font-bold"
                   >
                     <option value="percent">Percentage Off</option>
-                    <option value="fixed">Fixed AED Discount</option>
+                    <option value="fixed">Fixed USD Discount</option>
                     <option value="freebie">Free Addon / Service</option>
                   </select>
                 </div>

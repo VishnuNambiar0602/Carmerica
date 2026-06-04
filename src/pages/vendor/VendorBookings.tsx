@@ -172,7 +172,7 @@ const VendorBookings = () => {
   const handleExportCSV = () => {
     const headers = ['Booking ID', 'Customer', 'Email', 'Phone', 'Vehicle', 'Service', 'Date', 'Time', 'Status', 'Amount'];
     const rows = filteredBookings.map(b => [
-      b.id, b.customer, b.customer_email || '', b.phone || '', b.car, b.service, b.date, b.time, b.status, `AED ${b.price}`
+      b.id, b.customer, b.customer_email || '', b.phone || '', b.car, b.service, b.date, b.time, b.status, `$ ${b.price}`
     ]);
     const csv = [headers, ...rows].map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -450,7 +450,7 @@ const VendorBookings = () => {
                         {booking.status}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-sm font-black text-gray-900 border-r-2 border-black">AED {booking.price}</td>
+                    <td className="px-6 py-4 text-sm font-black text-gray-900 border-r-2 border-black">$ {booking.price}</td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex items-center justify-end gap-2">
                         {booking.phone && (
@@ -645,7 +645,7 @@ const VendorBookings = () => {
                   >
                     <option value="">-- Choose Service --</option>
                     {services.map(s => (
-                      <option key={s.id} value={s.id}>{s.name} (AED {s.price})</option>
+                      <option key={s.id} value={s.id}>{s.name} ($ {s.price})</option>
                     ))}
                     <option value="custom">Custom Service</option>
                   </select>
@@ -684,7 +684,7 @@ const VendorBookings = () => {
               </div>
 
               <div>
-                <label className="text-xs font-black text-gray-700 uppercase tracking-widest block">Price (AED) *</label>
+                <label className="text-xs font-black text-gray-700 uppercase tracking-widest block">Price (USD) *</label>
                 <input 
                   type="number" 
                   min="0"

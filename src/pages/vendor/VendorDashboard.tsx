@@ -118,7 +118,7 @@ const VendorDashboard = () => {
 
   const dashboardStats = [
     { name: 'Bookings', value: statsData ? String(statsData.periodBookings || statsData.totalBookings) : '120', icon: ClipboardList, color: 'text-blue-650', bg: 'bg-blue-50' },
-    { name: 'Revenue', value: statsData ? `AED ${Number(statsData.monthlyRevenue || 0).toLocaleString()}` : 'AED 24,300', icon: DollarSign, color: 'text-green-650', bg: 'bg-green-50' },
+    { name: 'Revenue', value: statsData ? `$ ${Number(statsData.monthlyRevenue || 0).toLocaleString()}` : '$ 24,300', icon: DollarSign, color: 'text-green-650', bg: 'bg-green-50' },
     { name: 'Rating', value: statsData ? Number(statsData.avgRating || 4.8).toFixed(1) : '4.8', icon: Star, color: 'text-yellow-500', bg: 'bg-yellow-50' },
     { name: 'Pending Jobs', value: statsData ? String(statsData.pending) : '8', icon: Clock, color: 'text-red-650', bg: 'bg-red-50' },
   ];
@@ -168,7 +168,7 @@ const VendorDashboard = () => {
               <div className="flex items-center gap-4 bg-white/5 border-2 border-white p-4 rounded-none shadow-[2px_2px_0px_0px_rgba(255,255,255,0.1)]">
                 <div>
                   <p className="text-[9px] font-black text-gray-500 uppercase tracking-wider">Recommended Price</p>
-                  <p className="text-2xl font-black text-red-500">AED {aiInsight.suggestedPrice || aiInsight.recommendedPrice}</p>
+                  <p className="text-2xl font-black text-red-500">$ {aiInsight.suggestedPrice || aiInsight.recommendedPrice}</p>
                 </div>
                 <div className="h-10 w-0.5 bg-white/20" />
                 <div>
@@ -303,10 +303,10 @@ const VendorDashboard = () => {
                   <div key={i} className="flex items-center justify-between p-3 bg-gray-50 border-2 border-black rounded-none shadow-[1.5px_1.5px_0px_0px_rgba(0,0,0,1)]">
                     <div>
                       <p className="text-xs font-black text-gray-900">{item.service}</p>
-                      <p className="text-[9px] text-gray-400 font-bold uppercase mt-0.5">Market: AED {item.market}</p>
+                      <p className="text-[9px] text-gray-400 font-bold uppercase mt-0.5">Market: $ {item.market}</p>
                     </div>
                     <div className="text-right">
-                      <p className="text-xs font-black text-gray-900">AED {item.current}</p>
+                      <p className="text-xs font-black text-gray-900">$ {item.current}</p>
                       <div className={cn("flex items-center text-[8px] font-black uppercase tracking-wider mt-0.5", item.trend === 'up' ? "text-green-600" : "text-red-600")}>
                         {item.trend === 'up' ? <ArrowUpRight className="h-3 w-3 mr-0.5" /> : <ArrowDownRight className="h-3 w-3 mr-0.5" />}
                         {item.trend === 'up' ? 'Underpriced' : 'Overpriced'}

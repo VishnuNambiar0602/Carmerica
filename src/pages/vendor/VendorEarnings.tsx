@@ -88,7 +88,7 @@ const VendorEarnings = () => {
       alert('You do not have any pending balance available for payout.');
       return;
     }
-    if (!confirm(`Request a payout of AED ${stats.pendingPayout}?`)) return;
+    if (!confirm(`Request a payout of $ ${stats.pendingPayout}?`)) return;
 
     try {
       const token = localStorage.getItem('token');
@@ -116,7 +116,7 @@ const VendorEarnings = () => {
   const handleExport = () => {
     const headers = ['Transaction ID', 'Date', 'Customer', 'Service', 'Amount', 'Status'];
     const rows = filteredTransactions.map(t => [
-      t.id, t.date, t.customer, t.service, `AED ${t.amount}`, t.status
+      t.id, t.date, t.customer, t.service, `$ ${t.amount}`, t.status
     ]);
     const csv = [headers, ...rows].map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -191,7 +191,7 @@ const VendorEarnings = () => {
       {stats.actualPendingRequests > 0 && (
         <div className="border-2 border-black bg-yellow-50 p-4 font-bold text-sm text-yellow-850 flex items-center gap-3 rounded-none shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">
           <Wallet className="h-5 w-5 text-yellow-600 animate-pulse" />
-          You have a pending payout request in progress: <span className="underline">AED {stats.actualPendingRequests}</span>.
+          You have a pending payout request in progress: <span className="underline">$ {stats.actualPendingRequests}</span>.
         </div>
       )}
 
@@ -207,7 +207,7 @@ const VendorEarnings = () => {
             </span>
           </div>
           <h3 className="text-gray-500 text-xs font-black uppercase tracking-widest">Total Earnings (Completed)</h3>
-          <p className="text-3xl font-black text-gray-900 mt-1">AED {stats.totalEarnings.toLocaleString()}</p>
+          <p className="text-3xl font-black text-gray-900 mt-1">$ {stats.totalEarnings.toLocaleString()}</p>
         </div>
         
         <div className="bg-white p-6 border-2 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:shadow-[5px_5px_0px_0px_rgba(0,0,0,1)] hover:-translate-y-0.5 transition-all rounded-none">
@@ -220,7 +220,7 @@ const VendorEarnings = () => {
             </span>
           </div>
           <h3 className="text-gray-500 text-xs font-black uppercase tracking-widest">Available Balance</h3>
-          <p className="text-3xl font-black text-gray-900 mt-1">AED {stats.pendingPayout.toLocaleString()}</p>
+          <p className="text-3xl font-black text-gray-900 mt-1">$ {stats.pendingPayout.toLocaleString()}</p>
         </div>
 
         <div className="bg-white p-6 border-2 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:shadow-[5px_5px_0px_0px_rgba(0,0,0,1)] hover:-translate-y-0.5 transition-all rounded-none">
@@ -233,7 +233,7 @@ const VendorEarnings = () => {
             </span>
           </div>
           <h3 className="text-gray-500 text-xs font-black uppercase tracking-widest">Completed Payouts</h3>
-          <p className="text-3xl font-black text-gray-900 mt-1">AED {stats.completedPayouts.toLocaleString()}</p>
+          <p className="text-3xl font-black text-gray-900 mt-1">$ {stats.completedPayouts.toLocaleString()}</p>
         </div>
       </div>
 
@@ -342,7 +342,7 @@ const VendorEarnings = () => {
                     <td className="px-6 py-4 text-sm font-bold text-gray-600 border-r-2 border-black">{txn.date}</td>
                     <td className="px-6 py-4 text-sm font-black text-gray-900 border-r-2 border-black">{txn.customer}</td>
                     <td className="px-6 py-4 text-sm font-bold text-gray-600 border-r-2 border-black">{txn.service}</td>
-                    <td className="px-6 py-4 text-sm font-black text-gray-900 border-r-2 border-black">AED {txn.amount}</td>
+                    <td className="px-6 py-4 text-sm font-black text-gray-900 border-r-2 border-black">$ {txn.amount}</td>
                     <td className="px-6 py-4">
                       <span className={cn(
                         "text-xs font-black px-2.5 py-1 border-2 border-black rounded-none shadow-[1px_1px_0px_0px_rgba(0,0,0,1)]",

@@ -132,7 +132,7 @@ const VendorReports = () => {
     if (bookings.length === 0) return;
     const headers = ['Booking ID', 'Customer', 'Vehicle', 'Service', 'Date', 'Time', 'Status', 'Amount'];
     const rows = bookings.map(b => [
-      b.id, b.customer_name || 'Customer', b.vehicle || '—', b.service || b.service_id || 'Service', b.scheduled_date || b.date, b.scheduled_time || b.time, b.status, `AED ${b.amount || b.price || 0}`
+      b.id, b.customer_name || 'Customer', b.vehicle || '—', b.service || b.service_id || 'Service', b.scheduled_date || b.date, b.scheduled_time || b.time, b.status, `$ ${b.amount || b.price || 0}`
     ]);
     const csv = [headers, ...rows].map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -163,9 +163,9 @@ const VendorReports = () => {
   };
 
   const reportStats = [
-    { name: 'Total Revenue', value: `AED ${totalRevenue.toLocaleString()}`, change: '+12.5%', icon: DollarSign, color: 'text-blue-600', bg: 'bg-blue-50' },
+    { name: 'Total Revenue', value: `$ ${totalRevenue.toLocaleString()}`, change: '+12.5%', icon: DollarSign, color: 'text-blue-600', bg: 'bg-blue-50' },
     { name: 'Period Bookings', value: bookingsCount.toLocaleString(), change: '+8.2%', icon: List, color: 'text-green-600', bg: 'bg-green-50' },
-    { name: 'Avg. Order Value', value: `AED ${avgOrderValue.toLocaleString()}`, change: '+5.1%', icon: Activity, color: 'text-yellow-600', bg: 'bg-yellow-50' },
+    { name: 'Avg. Order Value', value: `$ ${avgOrderValue.toLocaleString()}`, change: '+5.1%', icon: Activity, color: 'text-yellow-600', bg: 'bg-yellow-50' },
     { name: 'Customer Retention', value: '68%', change: '+2.4%', icon: User, color: 'text-purple-600', bg: 'bg-purple-50' },
   ];
 
@@ -316,7 +316,7 @@ const VendorReports = () => {
                       <tr key={idx} className="hover:bg-gray-50 transition-colors">
                         <td className="px-6 py-4 text-sm font-black text-gray-900 border-r-2 border-black">{service.name}</td>
                         <td className="px-6 py-4 text-sm font-bold text-gray-600 border-r-2 border-black">{service.bookings}</td>
-                        <td className="px-6 py-4 text-sm font-black text-gray-900 border-r-2 border-black">AED {service.revenue.toLocaleString()}</td>
+                        <td className="px-6 py-4 text-sm font-black text-gray-900 border-r-2 border-black">$ {service.revenue.toLocaleString()}</td>
                         <td className="px-6 py-4 border-r-2 border-black">
                           <div className="flex items-center text-[#feba02]">
                             <PieChart className="h-4.5 w-4.5 mr-2 text-blue-500" />
