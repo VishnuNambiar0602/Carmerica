@@ -20,7 +20,6 @@ import { db } from './lib/db.js';
 
 dotenv.config({ path: '.env.local', override: false });
 dotenv.config();
-assertProductionConfig();
 
 const app = express();
 const port = Number(process.env.PORT || 5000);
@@ -28,18 +27,6 @@ const nodeEnv = process.env.NODE_ENV || 'development';
 const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'http://localhost:3000').split(',').map((origin) => origin.trim()).filter(Boolean);
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const distDir = path.join(rootDir, 'dist');
-
-// --- Environment validation ---
-const requiredProdVars = ['JWT_SECRET'];
-const missingVars = requiredProdVars.filter((v) => !process.env[v] || process.env[v] === 'CHANGE_ME_TO_A_LONG_RANDOM_SECRET');
-if (nodeEnv === 'production' && missingVars.length > 0) {
-  console.error(`[FATAL] Production requires: ${missingVars.join(', ')}`);
-  process.exit(1);
-}
-
-if (nodeEnv === 'production' && !process.env.SUPABASE_URL && !process.env.DATABASE_URL) {
-  console.warn('[WARN] Running production without Supabase — using in-memory storage. Data will be lost on restart!');
-}
 
 // --- Security headers ---
 app.use(helmet({
@@ -108,6 +95,19 @@ export async function initializeApp() {
   if (initPromise) return initPromise;
 
   initPromise = (async () => {
+    // --- Environment validation ---
+    const requiredProdVars = ['JWT_SECRET'];
+    const missingVars = requiredProdVars.filter((v) => !process.env[v] || process.env[v] === 'CHANGE_ME_TO_A_LONG_RANDOM_SECRET');
+    if (nodeEnv === 'production' && missingVars.length > 0) {
+      throw new Error(`Production requires valid environment variables: ${missingVars.join(', ')}`);
+    }
+
+    assertProductionConfig();
+
+    if (nodeEnv === 'production' && !process.env.SUPABASE_URL && !process.env.DATABASE_URL) {
+      console.warn('[WARN] Running production without Supabase — using in-memory storage. Data will be lost on restart!');
+    }
+
     // Verify Supabase connection — if tables don't exist, falls back to in-memory
     const supabaseOk = await verifySupabaseConnection();
     if (nodeEnv === 'production' && !supabaseOk) {
