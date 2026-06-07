@@ -110,9 +110,8 @@ export async function initializeApp() {
 
     // Verify Supabase connection — if tables don't exist, falls back to in-memory
     const supabaseOk = await verifySupabaseConnection();
-    if (nodeEnv === 'production' && !supabaseOk) {
-      console.error('CRITICAL: Supabase connection failed in production.');
-      throw new Error('Supabase connection failed in production.');
+    if (!supabaseOk) {
+      console.warn('[WARN] Supabase connection failed or tables do not exist — running in-memory fallback. Data changes will be lost on restarts.');
     }
     db.refreshSupabaseStatus();
 
