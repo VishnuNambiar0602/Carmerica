@@ -188,10 +188,11 @@ router.post('/ai/chat', async (req, res, next) => {
     const conversationHistory = Array.isArray(req.body.conversationHistory) ? req.body.conversationHistory : [];
     const currentAgent = req.body.currentAgent || null;
     const userId = String(req.body.userId || 'user-1');
+    const userRole = String(req.body.userRole || 'customer');
     if (!userMessage.trim() && conversationHistory.length > 0) {
       return res.status(400).json({ message: 'userMessage is required' });
     }
-    const response = await sendAIMessage({ userMessage, conversationHistory, currentAgent, userId });
+    const response = await sendAIMessage({ userMessage, conversationHistory, currentAgent, userId, userRole });
     res.json(response);
   } catch (error) {
     next(error);

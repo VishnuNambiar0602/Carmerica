@@ -19,6 +19,7 @@ export interface SendMessageParams {
   conversationHistory: ChatMessage[];
   currentAgent: AgentType | null;
   userId: string;
+  userRole?: string;
 }
 
 export interface RoutingDecision {
@@ -107,10 +108,52 @@ function inferIntent(text: string): RoutingIntent {
   return 'unclear';
 }
 
-async function fetchDatabaseContext(agentType: AgentType, userId: string, userMessage: string): Promise<string> {
+async function fetchDatabaseContext(agentType: AgentType, userId: string, userMessage: string, userRole: string): Promise<string> {
   try {
+    const user = await db.findUserById(userId);
+    const vendor = user ? await db.findVendorByUserId(user.id) : null;
+    const vendorId = vendor?.id || null;
+
+    if (userRole === 'vendor' && vendorId) {
+      if (agentType === 'bookings') {
+        const bookings = await db.listBookings({ vendorId });
+        return JSON.stringify(bookings.slice(0, 10), null, 2);
+      }
+      if (agentType === 'reviews') {
+        const reviews = await db.listReviews();
+        const filtered = reviews.filter((r) => r.vendor_id === vendorId);
+        return JSON.stringify(filtered.slice(0, 10), null, 2);
+      }
+      if (agentType === 'maintenance') {
+        const services = await db.listServices({ vendorId });
+        return JSON.stringify(services.slice(0, 10), null, 2);
+      }
+      if (agentType === 'support') {
+        const staff = await db.listStaff(vendorId);
+        return JSON.stringify(staff.slice(0, 10), null, 2);
+      }
+    }
+
+    if (userRole === 'admin') {
+      if (agentType === 'bookings') {
+        const bookings = await db.listBookings({});
+        return JSON.stringify(bookings.slice(0, 15), null, 2);
+      }
+      if (agentType === 'reviews') {
+        const reviews = await db.listReviews();
+        return JSON.stringify(reviews.slice(0, 15), null, 2);
+      }
+      if (agentType === 'maintenance') {
+        const rules = await db.listPricingRules();
+        return JSON.stringify(rules.slice(0, 15), null, 2);
+      }
+      if (agentType === 'support') {
+        const supportTickets = await db.listSupportTickets ? await db.listSupportTickets() : [];
+        return JSON.stringify(supportTickets.slice(0, 15), null, 2);
+      }
+    }
+
     if (agentType === 'bookings') {
-      const user = await db.findUserById(userId);
       if (user) {
         const bookings = await db.listBookings({ customerEmail: user.email });
         return JSON.stringify(bookings.slice(0, 10), null, 2);
@@ -127,7 +170,6 @@ async function fetchDatabaseContext(agentType: AgentType, userId: string, userMe
     }
 
     if (agentType === 'maintenance') {
-      const user = await db.findUserById(userId);
       const { data: garages } = await db.listGarages();
       const vehicles = user ? await db.listVehicles(user.id) : [];
       return JSON.stringify({
@@ -137,15 +179,25 @@ async function fetchDatabaseContext(agentType: AgentType, userId: string, userMe
     }
 
     return 'No specialist context required.';
-  } catch {
+  } catch (err) {
+    console.error('[AI Context] Error fetching DB context:', err);
     return 'Unable to fetch live data — using general knowledge.';
   }
 }
 
-function buildSystemPrompt(activeAgentType: AgentType, conversationHistory: ChatMessage[], dbContext: string) {
+function buildSystemPrompt(activeAgentType: AgentType, conversationHistory: ChatMessage[], dbContext: string, userRole: string) {
   const activeConfig = AGENT_CONFIGS[activeAgentType];
+  let customInstruction = '';
+  if (userRole === 'vendor') {
+    customInstruction = `The user talking to you is a GARAGE VENDOR partner logged into the vendor portal. Address them as a partner, help them manage their bookings, reviews, earnings, promotions, and services catalog. Do not direct them to book a slot for themselves.`;
+  } else if (userRole === 'admin') {
+    customInstruction = `The user talking to you is a SYSTEM ADMINISTRATOR logged into the admin dashboard. Help them monitor platforms, fetch wide statistics, moderate reviews, or view logs. Keep replies professional, precise, and data-driven.`;
+  } else {
+    customInstruction = `The user talking to you is a CUSTOMER looking for services, viewing bookings, reviewing garages, or asking for support.`;
+  }
   return [
     `=== ACTIVE AGENT ===\n${activeConfig.name} (${activeConfig.role})\n${activeConfig.systemPrompt}`,
+    `=== USER ROLE & CONTEXT ===\n${customInstruction}`,
     `=== ROUTING INTENTS ===\nbookings, reviews, maintenance, general_support, unclear`,
     `=== RESPONSE FORMAT ===\nReturn only JSON: {"routing":{"intent":"...","confidence":"high|low"},"reply":"...","specialistReply":"optional handoff reply"}`,
     `=== CONVERSATION HISTORY ===\n${formatConversationHistory(conversationHistory)}`,
@@ -165,16 +217,31 @@ function parseAIResponse(raw: string): ResponseEnvelope | null {
 }
 
 function fallbackResponse(params: SendMessageParams): AgentResponse {
+  const userRole = params.userRole || 'customer';
   const activeAgentType = params.currentAgent || intentToAgentType(inferIntent(params.userMessage));
   const routingIntent = inferIntent(params.userMessage);
   const routedAgentType = routingIntent === 'unclear' ? activeAgentType : intentToAgentType(routingIntent);
   const config = AGENT_CONFIGS[routedAgentType];
 
   let reply = TEAM_LEAD_GREETING;
-  if (routedAgentType === 'bookings') reply = "I'm Emily, the bookings specialist. Let me look up your booking details — could you share the booking ID or your registered email?";
-  if (routedAgentType === 'reviews') reply = "Hello, I'm Maya. I can help with reviews and ratings. Which garage or service would you like to review?";
-  if (routedAgentType === 'maintenance') reply = "Hi, I'm Sam. I can recommend maintenance services and garages. Tell me about your vehicle and what you need.";
-  if (routedAgentType === 'support') reply = "Hi, I'm Riley. I can help with account, payment, refund, or platform issues. Please share the booking ID or account email so I can narrow this down.";
+  if (userRole === 'vendor') {
+    reply = "Hi there! I'm Jordan, your Vendor Portal assistant. I can connect you with booking management, review responses, payouts/earnings help, or catalog configuration. How can I help your garage business today?";
+    if (routedAgentType === 'bookings') reply = "I'm Emily, your bookings assistant. Let me look up your garage bookings list — could you provide a booking ID or customer name?";
+    if (routedAgentType === 'reviews') reply = "Hello, I'm Maya. I can summarize customer ratings for your garage and help you write replies to feedback.";
+    if (routedAgentType === 'maintenance') reply = "Hi, I'm Sam. I can help with garage service catalog details, pricing rules, and diagnostic categories.";
+    if (routedAgentType === 'support') reply = "Hi, I'm Riley. I can assist with payouts, payout request statuses, staff assignments, and platform settings.";
+  } else if (userRole === 'admin') {
+    reply = "Hello Admin! I'm Jordan, the Admin Assistant. I can help you query platform statistics, booking histories, flag reviews, process support tickets, or analyze vendor earnings. How can I support your system monitoring today?";
+    if (routedAgentType === 'bookings') reply = "Hello! I'm Emily. I can retrieve platform-wide booking metrics, search by booking IDs across all vendors, or pull up specific customer records.";
+    if (routedAgentType === 'reviews') reply = "Hello! I'm Maya. I can assist with moderation, reviews aggregation, flag statistics, or category reviews breakdown.";
+    if (routedAgentType === 'maintenance') reply = "Hello! I'm Sam. I can analyze platform service catalog trends, pricing rules, and competitor average configurations.";
+    if (routedAgentType === 'support') reply = "Hello! I'm Riley. I can retrieve platform support tickets, settings configurations, and resolve payment/refund issues.";
+  } else {
+    if (routedAgentType === 'bookings') reply = "I'm Emily, the bookings specialist. Let me look up your booking details — could you share the booking ID or your registered email?";
+    if (routedAgentType === 'reviews') reply = "Hello, I'm Maya. I can help with reviews and ratings. Which garage or service would you like to review?";
+    if (routedAgentType === 'maintenance') reply = "Hi, I'm Sam. I can recommend maintenance services and garages. Tell me about your vehicle and what you need.";
+    if (routedAgentType === 'support') reply = "Hi, I'm Riley. I can help with account, payment, refund, or platform issues. Please share the booking ID or account email so I can narrow this down.";
+  }
 
   return {
     reply,
@@ -186,9 +253,16 @@ function fallbackResponse(params: SendMessageParams): AgentResponse {
 }
 
 export async function sendAIMessage(params: SendMessageParams): Promise<AgentResponse> {
+  const userRole = params.userRole || 'customer';
   if (!params.currentAgent && params.conversationHistory.length === 0 && !params.userMessage.trim()) {
+    let reply = TEAM_LEAD_GREETING;
+    if (userRole === 'vendor') {
+      reply = "Hi there! I'm Jordan, your Vendor Portal assistant. I can connect you with booking management, review responses, payouts/earnings help, or catalog configuration. How can I help your garage business today?";
+    } else if (userRole === 'admin') {
+      reply = "Hello Admin! I'm Jordan, the Admin Assistant. I can help you query platform statistics, booking histories, flag reviews, process support tickets, or analyze vendor earnings. How can I support your system monitoring today?";
+    }
     return {
-      reply: TEAM_LEAD_GREETING,
+      reply,
       agentType: 'team_lead',
       agentName: 'Jordan (Team Lead)',
       handoffOccurred: false,
@@ -198,8 +272,8 @@ export async function sendAIMessage(params: SendMessageParams): Promise<AgentRes
 
   const inferred = inferIntent(params.userMessage);
   const activeAgentType = params.currentAgent || (inferred === 'unclear' ? 'team_lead' : intentToAgentType(inferred));
-  const dbContext = await fetchDatabaseContext(activeAgentType, params.userId, params.userMessage);
-  const systemPrompt = buildSystemPrompt(activeAgentType, params.conversationHistory, dbContext);
+  const dbContext = await fetchDatabaseContext(activeAgentType, params.userId, params.userMessage, userRole);
+  const systemPrompt = buildSystemPrompt(activeAgentType, params.conversationHistory, dbContext, userRole);
 
   try {
     const raw = await generate(systemPrompt, params.userMessage);
@@ -217,8 +291,8 @@ export async function sendAIMessage(params: SendMessageParams): Promise<AgentRes
       mode: 'ai',
     };
   } catch (error) {
-    if (error instanceof GroqError) return fallbackResponse(params);
-    throw error;
+    console.error('[AI] Chat error — falling back:', error);
+    return fallbackResponse(params);
   }
 }
 

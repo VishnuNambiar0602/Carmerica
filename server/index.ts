@@ -48,7 +48,23 @@ app.use(helmet({
 }));
 
 app.use(compression());
-app.use(cors({ origin: allowedOrigins, credentials: true }));
+
+app.use(cors((req, callback) => {
+  const origin = req.headers.origin;
+  const allowed = (process.env.ALLOWED_ORIGINS || 'http://localhost:3000')
+    .split(',')
+    .map((o) => o.trim())
+    .filter(Boolean);
+  const host = req.headers.host;
+  if (host) {
+    allowed.push(`https://${host}`);
+    allowed.push(`http://${host}`);
+  }
+  callback(null, {
+    origin: origin && allowed.includes(origin) ? origin : false,
+    credentials: true
+  });
+}));
 app.use(cookieParser());
 app.use(csrfProtection);
 
@@ -85,6 +101,45 @@ app.use(express.urlencoded({ extended: true, limit: '2mb' }));
 app.use(sanitizeInput);
 app.use(requestLogger);
 
+// --- Startup Initialization Promise ---
+let initPromise: Promise<void> | null = null;
+
+export async function initializeApp() {
+  if (initPromise) return initPromise;
+
+  initPromise = (async () => {
+    // Verify Supabase connection — if tables don't exist, falls back to in-memory
+    const supabaseOk = await verifySupabaseConnection();
+    if (nodeEnv === 'production' && !supabaseOk) {
+      console.error('CRITICAL: Supabase connection failed in production.');
+      throw new Error('Supabase connection failed in production.');
+    }
+    db.refreshSupabaseStatus();
+
+    // Bootstrap system admin
+    await bootstrapSystemAdmin();
+
+    // Initialize Stripe
+    await initStripe();
+  })();
+
+  return initPromise;
+}
+
+// Middleware to ensure the server is fully initialized before handling any requests
+app.use(async (req, res, next) => {
+  try {
+    await initializeApp();
+    next();
+  } catch (err) {
+    console.error('[Server] Initialization failed:', err);
+    res.status(500).json({ 
+      error: 'Server initialization failed', 
+      details: err instanceof Error ? err.message : String(err) 
+    });
+  }
+});
+
 // --- Health check ---
 app.get('/health', async (_req, res) => {
   const redis = await getRedisClient();
@@ -120,52 +175,41 @@ if (fs.existsSync(distDir)) {
 
 app.use(errorHandler);
 
-// --- Startup ---
-async function start() {
-  // Verify Supabase connection — if tables don't exist, falls back to in-memory
-  const supabaseOk = await verifySupabaseConnection();
-  if (nodeEnv === 'production' && !supabaseOk) {
-    console.error('CRITICAL: Supabase connection failed in production. Aborting startup.');
-    process.exit(1);
-  }
-  db.refreshSupabaseStatus();
-
-  // Bootstrap system admin
-  await bootstrapSystemAdmin();
-
-  // Initialize Stripe
-  await initStripe();
-
-  const server = app.listen(port, () => {
-    console.log(`[Server] Running in ${nodeEnv} mode on http://localhost:${port}`);
-    console.log(`[Server] Database: ${supabaseOk ? 'Supabase' : 'In-memory (dev mode)'}`);
-    console.log(`[Server] Redis: ${process.env.REDIS_URL ? 'Configured' : 'Not configured'}`);
-    console.log(`[Server] Payments: ${process.env.STRIPE_SECRET_KEY ? 'Stripe' : 'Mock mode'}`);
-    console.log(`[Server] AI: ${process.env.GROQ_API_KEY ? 'Configured' : 'Not configured'}`);
-  });
-
-  function shutdown(signal: string) {
-    console.log(`[Server] Received ${signal}, shutting down gracefully...`);
-    server.close(() => {
-      process.exit(0);
+// --- Local Startup ---
+if (process.env.VERCEL !== '1') {
+  initializeApp().then(() => {
+    const server = app.listen(port, () => {
+      console.log(`[Server] Running in ${nodeEnv} mode on http://localhost:${port}`);
+      console.log(`[Server] Database: ${process.env.DATABASE_URL ? 'Supabase' : 'In-memory (dev mode)'}`);
+      console.log(`[Server] Redis: ${process.env.REDIS_URL ? 'Configured' : 'Not configured'}`);
+      console.log(`[Server] Payments: ${process.env.STRIPE_SECRET_KEY ? 'Stripe' : 'Mock mode'}`);
+      console.log(`[Server] AI: ${process.env.GROQ_API_KEY ? 'Configured' : 'Not configured'}`);
     });
-    setTimeout(() => {
-      console.error('[Server] Forced shutdown after timeout');
-      process.exit(1);
-    }, 10000).unref();
-  }
 
-  process.on('SIGINT', () => shutdown('SIGINT'));
-  process.on('SIGTERM', () => shutdown('SIGTERM'));
-  process.on('uncaughtException', (err) => {
-    console.error('[Server] Uncaught exception:', err);
-  });
-  process.on('unhandledRejection', (reason) => {
-    console.error('[Server] Unhandled rejection:', reason);
+    function shutdown(signal: string) {
+      console.log(`[Server] Received ${signal}, shutting down gracefully...`);
+      server.close(() => {
+        process.exit(0);
+      });
+      setTimeout(() => {
+        console.error('[Server] Forced shutdown after timeout');
+        process.exit(1);
+      }, 10000).unref();
+    }
+
+    process.on('SIGINT', () => shutdown('SIGINT'));
+    process.on('SIGTERM', () => shutdown('SIGTERM'));
+  }).catch((err) => {
+    console.error('[Server] Failed to start:', err);
+    process.exit(1);
   });
 }
 
-start().catch((err) => {
-  console.error('[Server] Failed to start:', err);
-  process.exit(1);
+process.on('uncaughtException', (err) => {
+  console.error('[Server] Uncaught exception:', err);
 });
+process.on('unhandledRejection', (reason) => {
+  console.error('[Server] Unhandled rejection:', reason);
+});
+
+export default app;

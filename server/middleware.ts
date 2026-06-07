@@ -62,7 +62,15 @@ export function csrfProtection(req: Request, res: Response, next: NextFunction) 
   if (safeMethods.includes(req.method)) return next();
 
   const origin = req.headers.origin;
-  const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'http://localhost:3000').split(',').map((o) => o.trim());
+  const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'http://localhost:3000')
+    .split(',')
+    .map((o) => o.trim())
+    .filter(Boolean);
+  const host = req.headers.host;
+  if (host) {
+    allowedOrigins.push(`https://${host}`);
+    allowedOrigins.push(`http://${host}`);
+  }
   const referer = req.headers.referer;
 
   if (origin && !allowedOrigins.includes(origin)) {

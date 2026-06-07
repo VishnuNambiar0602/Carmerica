@@ -29,6 +29,17 @@ const getUserId = (): string => {
   }
 };
 
+const getUserRole = (): string => {
+  const token = localStorage.getItem('token');
+  if (!token) return 'customer';
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    return payload.role || 'customer';
+  } catch {
+    return 'customer';
+  }
+};
+
 const AGENT_NAMES: Record<AgentType, string> = {
   team_lead: 'Jordan (Team Lead)',
   bookings: 'Emily (Bookings)',
@@ -122,6 +133,7 @@ export default function ChatWidget() {
         conversationHistory: [],
         currentAgent: null,
         userId: getUserId(),
+        userRole: getUserRole(),
       });
       processResponse(response);
     } catch (err) {
@@ -142,6 +154,7 @@ export default function ChatWidget() {
         conversationHistory: currentHistory,
         currentAgent: agentType,
         userId: getUserId(),
+        userRole: getUserRole(),
       });
       processResponse(response);
     } catch (err) {
@@ -246,6 +259,7 @@ export default function ChatWidget() {
             conversationHistory: [...historyBeforeUpdate, userMessage],
             currentAgent: state.activeAgent,
             userId: getUserId(),
+            userRole: getUserRole(),
           });
           processResponse(response);
         }

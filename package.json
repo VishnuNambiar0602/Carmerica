@@ -8,7 +8,7 @@
     "start": "npm run migrate && tsx server/index.ts",
     "dev:frontend": "vite --port=3000 --host=0.0.0.0",
     "dev": "concurrently \"npm run dev:frontend\" \"npm run server\"",
-    "build": "vite build",
+    "build": "npm run migrate && vite build",
     "preview": "vite preview",
     "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\"",
     "migrate": "tsx server/migrate.ts",

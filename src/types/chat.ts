@@ -79,4 +79,5 @@ export interface SendMessageParams {
   conversationHistory: ChatMessage[];
   currentAgent: AgentType | null;
   userId: string;
+  userRole?: string;
 }
