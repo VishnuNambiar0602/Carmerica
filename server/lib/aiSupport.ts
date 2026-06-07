@@ -216,7 +216,7 @@ function parseAIResponse(raw: string): ResponseEnvelope | null {
   return null;
 }
 
-function fallbackResponse(params: SendMessageParams): AgentResponse {
+function fallbackResponse(params: SendMessageParams, error?: any): AgentResponse {
   const userRole = params.userRole || 'customer';
   const activeAgentType = params.currentAgent || intentToAgentType(inferIntent(params.userMessage));
   const routingIntent = inferIntent(params.userMessage);
@@ -241,6 +241,11 @@ function fallbackResponse(params: SendMessageParams): AgentResponse {
     if (routedAgentType === 'reviews') reply = "Hello, I'm Maya. I can help with reviews and ratings. Which garage or service would you like to review?";
     if (routedAgentType === 'maintenance') reply = "Hi, I'm Sam. I can recommend maintenance services and garages. Tell me about your vehicle and what you need.";
     if (routedAgentType === 'support') reply = "Hi, I'm Riley. I can help with account, payment, refund, or platform issues. Please share the booking ID or account email so I can narrow this down.";
+  }
+
+  if (error) {
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    reply += `\n\n[DEBUG AI Fallback: ${errorMsg}]`;
   }
 
   return {
@@ -278,7 +283,7 @@ export async function sendAIMessage(params: SendMessageParams): Promise<AgentRes
   try {
     const raw = await generate(systemPrompt, params.userMessage);
     const envelope = parseAIResponse(raw);
-    if (!envelope) return fallbackResponse(params);
+    if (!envelope) return fallbackResponse(params, new Error('Failed to parse AI response as JSON envelope'));
 
     const nextAgentType = envelope.routing.confidence === 'low' ? 'team_lead' : intentToAgentType(envelope.routing.intent);
     const nextConfig = AGENT_CONFIGS[nextAgentType];
@@ -292,7 +297,7 @@ export async function sendAIMessage(params: SendMessageParams): Promise<AgentRes
     };
   } catch (error) {
     console.error('[AI] Chat error — falling back:', error);
-    return fallbackResponse(params);
+    return fallbackResponse(params, error);
   }
 }
 
