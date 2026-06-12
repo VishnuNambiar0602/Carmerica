@@ -1,4 +1,4 @@
-import { GroqError, generate } from './groq.js';
+import { generate } from './gemini.js';
 import { db } from './db.js';
 
 export type AgentType = 'team_lead' | 'bookings' | 'reviews' | 'maintenance' | 'support';
@@ -302,11 +302,12 @@ export async function sendAIMessage(params: SendMessageParams): Promise<AgentRes
 }
 
 export function getAIStatus() {
-  const configured = Boolean(process.env.GROQ_API_KEY && process.env.GROQ_API_KEY !== 'YOUR_GROQ_API_KEY' && process.env.GROQ_API_KEY !== 'your_groq_api_key_here');
+  const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_GENAI_API_KEY;
+  const configured = Boolean(apiKey && apiKey !== 'MY_GEMINI_API_KEY' && apiKey !== 'your_gemini_api_key_here');
   return {
     status: 'ok',
-    provider: 'groq',
-    model: process.env.GROQ_MODEL || 'llama-3.1-8b-instant',
+    provider: 'gemini',
+    model: 'gemini-2.5-flash',
     configured,
     fallbackEnabled: true,
     database: db.isSupabase ? 'supabase' : 'memory-backed',

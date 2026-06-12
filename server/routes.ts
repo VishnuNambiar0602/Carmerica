@@ -5,7 +5,7 @@ import { db } from './lib/db.js';
 import { cacheDel as baseCacheDel, cacheGet, cacheSet } from './lib/redis.js';
 import { getAIStatus, sendAIMessage } from './lib/aiSupport.js';
 import { sendPasswordResetEmail, sendMail, sendVerificationEmail } from './lib/mailer.js';
-import { generate } from './lib/groq.js';
+import { generate } from './lib/gemini.js';
 import { getJwtSecret } from './lib/config.js';
 import {
   createPaymentIntent,
@@ -328,7 +328,7 @@ router.post('/ai/identify-part', async (req, res) => {
       return res.status(400).json({ message: 'image and mimeType required' });
     }
 
-    const apiKey = process.env.GEMINI_API_KEY;
+    const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_GENAI_API_KEY;
     if (!apiKey || apiKey === 'MY_GEMINI_API_KEY') {
       return res.json({
         name: 'Brake Pad',
@@ -385,12 +385,12 @@ router.post('/ai/predict-maintenance', async (req, res) => {
       return res.status(400).json({ message: 'make, model, year, mileage required' });
     }
 
-    const apiKey = process.env.GROQ_API_KEY;
-    if (!apiKey || apiKey === 'YOUR_GROQ_API_KEY_HERE') {
-      throw new Error('Groq not configured');
+    const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_GENAI_API_KEY;
+    if (!apiKey || apiKey === 'MY_GEMINI_API_KEY') {
+      throw new Error('Gemini not configured');
     }
 
-    const { generate } = await import('./lib/groq.js');
+    const { generate } = await import('./lib/gemini.js');
 
     const prompt = `You are a senior automotive maintenance advisor.
       Vehicle: ${year} ${make} ${model}
