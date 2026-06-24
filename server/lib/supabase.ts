@@ -45,8 +45,8 @@ export async function verifySupabaseConnection(): Promise<boolean> {
 
   try {
     const { error } = await client.from('users').select('id').limit(1).maybeSingle();
-    if (error && error.code === '42P01') {
-      console.warn('[Supabase] "users" table does not exist — falling back to in-memory storage');
+    if (error) {
+      console.warn(`[Supabase] Verification query failed (${error.code}: ${error.message}) — falling back to in-memory storage`);
       verified = true;
       verifiedOk = false;
       return false;
