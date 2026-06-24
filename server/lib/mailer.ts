@@ -82,3 +82,26 @@ export async function sendVerificationEmail(to: string, token: string) {
   });
 }
 
+export async function sendOtpEmail(to: string, otp: string, purpose: 'registration' | 'login') {
+  const subject = purpose === 'registration' 
+    ? 'Verify your CarMerica Registration' 
+    : 'Your CarMerica Login OTP Code';
+    
+  const text = `Your OTP code for ${purpose} is: ${otp}. It will expire in 10 minutes.`;
+  const html = `
+    <div style="font-family: sans-serif; padding: 20px; max-width: 600px; border: 1px solid #eee; border-radius: 10px;">
+      <h2 style="color: #003580;">CarMerica Security Alert</h2>
+      <p>Hello,</p>
+      <p>We received a request for <strong>${purpose}</strong> on your CarMerica account.</p>
+      <p style="font-size: 16px; margin: 10px 0;">Your One-Time Password (OTP) is:</p>
+      <div style="font-size: 28px; font-weight: bold; color: #003580; letter-spacing: 2px; padding: 15px 0; text-align: center; background-color: #f4f6f9; border-radius: 5px; margin: 20px 0;">
+        ${otp}
+      </div>
+      <p style="font-size: 12px; color: #666;">This code is valid for 10 minutes. If you did not request this, please secure your account immediately.</p>
+    </div>
+  `;
+
+  await sendMail({ to, subject, text, html });
+}
+
+

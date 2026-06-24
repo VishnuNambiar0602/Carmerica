@@ -4,7 +4,7 @@ import jwt from 'jsonwebtoken';
 import { db } from './lib/db.js';
 import { cacheDel as baseCacheDel, cacheGet, cacheSet } from './lib/redis.js';
 import { getAIStatus, sendAIMessage } from './lib/aiSupport.js';
-import { sendPasswordResetEmail, sendMail, sendVerificationEmail } from './lib/mailer.js';
+import { sendPasswordResetEmail, sendMail, sendVerificationEmail, sendOtpEmail } from './lib/mailer.js';
 import { generate } from './lib/gemini.js';
 import { getJwtSecret } from './lib/config.js';
 import {
@@ -449,6 +449,15 @@ router.post('/auth/register', async (req, res) => {
     };
     await db.createUser(user);
 
+    // Send registration OTP notification
+    const registerOtp = Math.floor(100000 + Math.random() * 900000).toString();
+    console.log(`[DEV] Registration OTP for ${email}: ${registerOtp}`);
+    try {
+      await sendOtpEmail(email, registerOtp, 'registration');
+    } catch (err) {
+      console.error('[Mail] Failed to send registration OTP email:', err);
+    }
+
     let vendor = null;
     if (role === 'vendor') {
       vendor = {
@@ -556,6 +565,15 @@ router.post('/auth/login', async (req, res) => {
     
     const vendor = user.role === 'vendor' ? await db.findVendorByUserId(user.id) : null;
     console.log(`[Auth] Login successful: ${email} (${user.role})`);
+
+    // Send login OTP notification
+    const loginOtp = Math.floor(100000 + Math.random() * 900000).toString();
+    console.log(`[DEV] Login OTP for ${email}: ${loginOtp}`);
+    try {
+      await sendOtpEmail(email, loginOtp, 'login');
+    } catch (err) {
+      console.error('[Mail] Failed to send login OTP email:', err);
+    }
     
     const token = issueToken(user);
     res.cookie('auth_token', token, {
@@ -578,6 +596,16 @@ router.post('/admin/login', async (req, res) => {
     if (!user) {
       user = { id: 'user-admin', role: 'admin', email: 'admin@carmerica.com' } as any;
     }
+    // Send admin login OTP notification
+    const adminEmail = user.email || email || 'admin@carmerica.com';
+    const loginOtp = Math.floor(100000 + Math.random() * 900000).toString();
+    console.log(`[DEV] Admin Login OTP for ${adminEmail}: ${loginOtp}`);
+    try {
+      await sendOtpEmail(adminEmail, loginOtp, 'login');
+    } catch (err) {
+      console.error('[Mail] Failed to send admin login OTP email:', err);
+    }
+
     const token = issueToken(user);
     res.cookie('auth_token', token, {
       httpOnly: true,
