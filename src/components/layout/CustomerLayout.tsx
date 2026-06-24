@@ -216,6 +216,7 @@ const Footer = () => {
             <h3 className="text-gray-900 font-bold text-xs tracking-wider uppercase mb-4">Support</h3>
             <ul className="space-y-2.5 text-sm">
               <li><Link to="/support" className="hover:text-blue-600 transition-colors">Help Center</Link></li>
+              <li><Link to="/faq" className="hover:text-blue-600 transition-colors">Community FAQs</Link></li>
               <li><Link to="/support" className="hover:text-blue-600 transition-colors">Safety Resource</Link></li>
               <li><Link to="/contact" className="hover:text-blue-600 transition-colors">Contact Support</Link></li>
             </ul>
@@ -224,7 +225,7 @@ const Footer = () => {
             <h3 className="text-gray-900 font-bold text-xs tracking-wider uppercase mb-4">Company</h3>
             <ul className="space-y-2.5 text-sm">
               <li><Link to="/about" className="hover:text-blue-600 transition-colors">About Us</Link></li>
-              <li><Link to="/blog" className="hover:text-blue-600 transition-colors">Blog</Link></li>
+              <li><Link to="/blog" className="hover:text-blue-600 transition-colors">Blogs</Link></li>
               <li><Link to="/offers" className="hover:text-blue-600 transition-colors">Offers</Link></li>
             </ul>
           </div>

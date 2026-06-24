@@ -49,6 +49,7 @@ import ForgotPassword from './pages/customer/ForgotPassword';
 import VendorForgotPassword from './pages/vendor/VendorForgotPassword';
 import VendorRegister from './pages/vendor/VendorRegister';
 import VendorGarageSetup from './pages/vendor/VendorGarageSetup';
+import FAQ from './pages/customer/FAQ';
 
 const SectionCard = ({ title, body, cta, to }: { title: string; body: string; cta: string; to: string }) => (
   <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-6">
@@ -160,6 +161,7 @@ function App() {
           <Route path="about" element={<About />} />
           <Route path="contact" element={<Contact />} />
           <Route path="blog" element={<Blog />} />
+          <Route path="faq" element={<FAQ />} />
         </Route>
 
         {/* Vendor Routes */}
