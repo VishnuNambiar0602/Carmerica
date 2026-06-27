@@ -48,3 +48,16 @@ export async function cacheDel(key: string) {
   if (!redis) return;
   await redis.del(key);
 }
+
+export async function cacheDelPattern(pattern: string) {
+  const redis = await getRedisClient();
+  if (!redis) return;
+  try {
+    const keys = await redis.keys(pattern);
+    if (keys && keys.length > 0) {
+      await redis.del(keys);
+    }
+  } catch (err) {
+    console.error('[Redis] Error deleting pattern ' + pattern + ':', err);
+  }
+}

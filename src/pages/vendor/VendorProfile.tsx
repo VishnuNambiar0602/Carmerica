@@ -18,6 +18,19 @@ import {
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
+const PREDEFINED_LOCATIONS = [
+  'Al Quoz, Dubai',
+  'Deira, Dubai',
+  'Al Barsha, Dubai',
+  'Jumeirah, Dubai',
+  'Mussafah, Abu Dhabi',
+  'Al Khalidiyah, Abu Dhabi',
+  'Industrial Area, Sharjah',
+  'Al Majaz, Sharjah',
+  'Al Jurf, Ajman',
+  'Al Nakheel, Ras Al Khaimah'
+];
+
 const VendorProfile = () => {
   const [activeTab, setActiveTab] = React.useState('general');
   const [documents, setDocuments] = React.useState<any[]>([]);
@@ -397,13 +410,32 @@ const VendorProfile = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
                     <label className="text-sm font-black text-gray-700">Street Address *</label>
-                    <input 
-                      type="text" 
-                      value={profile.location}
-                      onChange={(e) => setProfile(p => ({ ...p, location: e.target.value }))}
-                      placeholder="e.g. 123 Main St, Al Quoz" 
-                      className="w-full px-4 py-2.5 border-2 border-black rounded-none text-sm outline-none focus:ring-2 focus:ring-[#003580]" 
-                    />
+                    <select
+                      value={PREDEFINED_LOCATIONS.includes(profile.location) ? profile.location : (profile.location ? 'Other' : 'Al Quoz, Dubai')}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (val === 'Other') {
+                          setProfile(p => ({ ...p, location: '' }));
+                        } else {
+                          setProfile(p => ({ ...p, location: val }));
+                        }
+                      }}
+                      className="w-full px-4 py-2.5 border-2 border-black rounded-none text-sm outline-none focus:ring-2 focus:ring-[#003580] bg-white text-black"
+                    >
+                      {PREDEFINED_LOCATIONS.map((loc) => (
+                        <option key={loc} value={loc}>{loc}</option>
+                      ))}
+                      <option value="Other">Other (Type custom location)</option>
+                    </select>
+                    {(!PREDEFINED_LOCATIONS.includes(profile.location) || profile.location === '') && (
+                      <input 
+                        type="text" 
+                        value={profile.location}
+                        onChange={(e) => setProfile(p => ({ ...p, location: e.target.value }))}
+                        placeholder="Enter custom address/location..." 
+                        className="w-full px-4 py-2.5 border-2 border-black rounded-none text-sm outline-none focus:ring-2 focus:ring-[#003580] mt-2" 
+                      />
+                    )}
                   </div>
                   <div className="space-y-2">
                     <label className="text-sm font-black text-gray-700">City</label>

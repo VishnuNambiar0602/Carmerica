@@ -2,10 +2,23 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Building2, MapPin, Phone, Clock, FileText, Loader2, Compass, AlertCircle } from 'lucide-react';
 
+const PREDEFINED_LOCATIONS = [
+  'Al Quoz, Dubai',
+  'Deira, Dubai',
+  'Al Barsha, Dubai',
+  'Jumeirah, Dubai',
+  'Mussafah, Abu Dhabi',
+  'Al Khalidiyah, Abu Dhabi',
+  'Industrial Area, Sharjah',
+  'Al Majaz, Sharjah',
+  'Al Jurf, Ajman',
+  'Al Nakheel, Ras Al Khaimah'
+];
+
 export default function VendorGarageSetup() {
   const navigate = useNavigate();
   const [name, setName] = React.useState('');
-  const [location, setLocation] = React.useState('');
+  const [location, setLocation] = React.useState('Al Quoz, Dubai');
   const [city, setCity] = React.useState('Dubai');
   const [phone, setPhone] = React.useState('');
   const [openingHours, setOpeningHours] = React.useState('8:00 AM - 6:00 PM');
@@ -174,20 +187,43 @@ export default function VendorGarageSetup() {
               <div className="md:col-span-2 space-y-2">
                 <label className="text-xs font-bold text-gray-400 uppercase tracking-widest">Address / Location *</label>
                 <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                    <MapPin className="h-5 w-5 text-gray-400" />
-                  </div>
-                  <input
-                    type="text"
-                    placeholder="e.g. Warehouse 15, Street 4, Al Quoz 3"
-                    value={location}
-                    onChange={(e) => setLocation(e.target.value)}
-                    className={`w-full p-4 pl-12 bg-gray-50 border rounded-2xl focus:bg-white focus:border-[#003580] outline-none transition-all font-medium ${
-                      errors.location ? 'border-red-600 focus:border-red-600 bg-red-50/5' : 'border-gray-100'
+                  <select
+                    value={PREDEFINED_LOCATIONS.includes(location) ? location : (location ? 'Other' : 'Al Quoz, Dubai')}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val === 'Other') {
+                        setLocation('');
+                      } else {
+                        setLocation(val);
+                      }
+                    }}
+                    className={`w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl focus:bg-white focus:border-[#003580] outline-none transition-all font-medium appearance-none ${
+                      errors.location ? 'border-red-600' : ''
                     }`}
-                  />
+                  >
+                    {PREDEFINED_LOCATIONS.map((loc) => (
+                      <option key={loc} value={loc}>{loc}</option>
+                    ))}
+                    <option value="Other">Other (Type custom location)</option>
+                  </select>
                 </div>
-                {errors.location && <p className="text-xs text-red-600 font-bold">{errors.location}</p>}
+                {(!PREDEFINED_LOCATIONS.includes(location) || location === '') && (
+                  <div className="relative mt-3">
+                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                      <MapPin className="h-5 w-5 text-gray-400" />
+                    </div>
+                    <input
+                      type="text"
+                      placeholder="e.g. Warehouse 15, Street 4, Al Quoz 3"
+                      value={location}
+                      onChange={(e) => setLocation(e.target.value)}
+                      className={`w-full p-4 pl-12 bg-gray-50 border rounded-2xl focus:bg-white focus:border-[#003580] outline-none transition-all font-medium ${
+                        errors.location ? 'border-red-600 focus:border-red-600 bg-red-50/5' : 'border-gray-100'
+                      }`}
+                    />
+                  </div>
+                )}
+                {errors.location && <p className="text-xs text-red-600 font-bold mt-1">{errors.location}</p>}
               </div>
 
               <div className="space-y-2">

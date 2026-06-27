@@ -14,7 +14,11 @@ import {
   Phone,
   Check,
   XCircle,
-  AlertCircle
+  AlertCircle,
+  DollarSign,
+  Star,
+  ClipboardList,
+  ArrowUpRight
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
@@ -36,6 +40,7 @@ interface Booking {
 const VendorBookings = () => {
   const [activeTab, setActiveTab] = React.useState<'all' | 'pending' | 'active' | 'completed'>('all');
   const [bookings, setBookings] = React.useState<Booking[]>([]);
+  const [statsData, setStatsData] = React.useState<any>(null);
   const [services, setServices] = React.useState<any[]>([]);
   const [garageId, setGarageId] = React.useState('garage-1');
   const [vendorId, setVendorId] = React.useState('vendor-1');
@@ -114,6 +119,14 @@ const VendorBookings = () => {
       });
       if (svcRes.ok) {
         setServices(await svcRes.json());
+      }
+
+      // Fetch stats
+      const statsRes = await fetch(`/api/vendor/stats?vendorId=${encodeURIComponent(vId)}&period=month`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (statsRes.ok) {
+        setStatsData(await statsRes.json());
       }
     } catch (err) {
       console.error(err);
@@ -288,6 +301,13 @@ const VendorBookings = () => {
   // Unique service types for filtering
   const uniqueServiceNames = Array.from(new Set(bookings.map(b => b.service)));
 
+  const bookingStats = [
+    { name: 'Bookings', value: statsData ? String(statsData.periodBookings || statsData.totalBookings) : '120', icon: ClipboardList, color: 'text-blue-655', bg: 'bg-blue-50' },
+    { name: 'Revenue', value: statsData ? `$ ${Number(statsData.monthlyRevenue || 0).toLocaleString()}` : '$ 24,300', icon: DollarSign, color: 'text-green-655', bg: 'bg-green-50' },
+    { name: 'Rating', value: statsData ? Number(statsData.avgRating || 4.8).toFixed(1) : '4.8', icon: Star, color: 'text-yellow-500', bg: 'bg-yellow-50' },
+    { name: 'Pending Jobs', value: statsData ? String(statsData.pending) : '8', icon: Clock, color: 'text-red-655', bg: 'bg-red-50' },
+  ];
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -309,6 +329,24 @@ const VendorBookings = () => {
             <Plus className="h-4 w-4 mr-2" /> Schedule New
           </button>
         </div>
+      </div>
+
+      {/* Stats Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        {bookingStats.map((stat) => (
+          <div key={stat.name} className="bg-white p-6 border-2 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:shadow-[5px_5px_0px_0px_rgba(0,0,0,1)] hover:-translate-y-0.5 transition-all rounded-none">
+            <div className="flex items-center justify-between mb-4">
+              <div className={cn("p-3 border-2 border-black rounded-none shadow-[1px_1px_0px_0px_rgba(0,0,0,1)]", stat.bg)}>
+                <stat.icon className={cn("h-5 w-5", stat.color)} />
+              </div>
+              <span className="text-[10px] font-black text-green-700 bg-green-50 px-2 py-0.5 border border-green-200 shadow-[1px_1px_0px_0px_rgba(0,0,0,1)] rounded-none flex items-center">
+                <ArrowUpRight className="h-3 w-3 mr-0.5" /> 12%
+              </span>
+            </div>
+            <h3 className="text-gray-500 text-xs font-black uppercase tracking-widest">{stat.name}</h3>
+            <p className="text-2xl font-black text-gray-900 mt-1">{stat.value}</p>
+          </div>
+        ))}
       </div>
 
       {/* Tabs & Search */}

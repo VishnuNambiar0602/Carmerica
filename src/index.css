@@ -115,3 +115,28 @@ body {
 .admin-portal textarea::placeholder {
   color: #9ca3af !important; /* text-gray-400 placeholder */
 }
+
+/* Vendor Portal Theme Resets to prevent white-on-white text bugs */
+.vendor-portal .bg-white,
+.vendor-portal .bg-gray-50,
+.vendor-portal .bg-gray-50\/50,
+.vendor-portal .bg-gray-100 {
+  color: #111827; /* Force dark text on light backgrounds */
+}
+
+.vendor-portal input,
+.vendor-portal textarea {
+  color: #111827 !important;
+  background-color: #ffffff !important;
+}
+
+.vendor-portal input::placeholder,
+.vendor-portal textarea::placeholder {
+  color: #9ca3af !important;
+}
+
+/* Global / Specific dropdown select font color resets to black */
+select, select option, .vendor-portal select, .admin-portal select {
+  color: #000000 !important;
+  background-color: #ffffff !important;
+}

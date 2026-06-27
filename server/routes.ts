@@ -2,7 +2,7 @@ import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { db } from './lib/db.js';
-import { cacheDel as baseCacheDel, cacheGet, cacheSet } from './lib/redis.js';
+import { cacheDel as baseCacheDel, cacheGet, cacheSet, cacheDelPattern } from './lib/redis.js';
 import { getAIStatus, sendAIMessage } from './lib/aiSupport.js';
 import { sendPasswordResetEmail, sendMail, sendVerificationEmail, sendOtpEmail } from './lib/mailer.js';
 import { generate } from './lib/gemini.js';
@@ -107,6 +107,14 @@ const clearBookingCache = async (booking: any) => {
     booking.customer_email ? cacheDel(`bookings:customer:${booking.customer_email}`) : Promise.resolve(),
     cacheDel('bookings:all'),
   ]);
+};
+
+const clearGarageCache = async () => {
+  try {
+    await cacheDelPattern('garages:*');
+  } catch (err) {
+    console.error('[Cache] Failed to clear garage cache:', err);
+  }
 };
 
 const matches = (item: any, q: string) => {
@@ -850,6 +858,7 @@ router.post('/garages', requireRole('vendor', 'admin'), async (req: any, res) =>
       created_at: now(), updated_at: now(),
     };
     const created = await db.createGarage(garage);
+    await clearGarageCache();
     res.status(201).json(created);
   } catch {
     res.status(500).json({ message: 'Failed to create garage' });
@@ -860,6 +869,7 @@ router.patch('/garages/:id', requireRole('vendor', 'admin'), async (req, res) =>
   try {
     const updated = await db.updateGarage(req.params.id, req.body);
     if (!updated) return res.status(404).json({ message: 'Garage not found' });
+    await clearGarageCache();
     res.json(updated);
   } catch {
     res.status(500).json({ message: 'Failed to update garage' });
