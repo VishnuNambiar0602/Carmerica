@@ -449,6 +449,29 @@ class InMemoryStore {
       { id: 3, thread_id: 1, text: "That's great news. Is my car ready for pickup?", sender: 'customer', time: '10:30 AM' },
       { id: 4, thread_id: 2, text: 'Thank you for the great service!', sender: 'customer', time: 'Yesterday' },
     );
+
+    // Load generated dummy data if available
+    try {
+      const fs = await import('node:fs');
+      const path = await import('node:path');
+      const { fileURLToPath } = await import('node:url');
+      const currentDir = path.dirname(fileURLToPath(import.meta.url));
+      const dummyPath = path.join(currentDir, 'dummy-data.json');
+      if (fs.existsSync(dummyPath)) {
+        const rawDummy = fs.readFileSync(dummyPath, 'utf-8');
+        const dummy = JSON.parse(rawDummy);
+        if (dummy.users) this.users.push(...dummy.users);
+        if (dummy.vendors) this.vendors.push(...dummy.vendors);
+        if (dummy.garages) this.garages.push(...dummy.garages);
+        if (dummy.services) this.services.push(...dummy.services);
+        if (dummy.vehicles) this.vehicles.push(...dummy.vehicles);
+        if (dummy.bookings) this.bookings.push(...dummy.bookings);
+        if (dummy.reviews) this.reviews.push(...dummy.reviews);
+        console.log(`[DB] Seeded ${dummy.users?.length} customers/vendors, ${dummy.garages?.length} garages, ${dummy.vehicles?.length} vehicles, ${dummy.bookings?.length} bookings, ${dummy.reviews?.length} reviews.`);
+      }
+    } catch (err) {
+      console.warn('[DB] Failed to load dynamic dummy-data.json:', err);
+    }
   }
 }
 

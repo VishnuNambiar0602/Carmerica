@@ -6,6 +6,8 @@ import { useNavigate } from 'react-router-dom';
 interface VendorRecord {
   id: string;
   name: string;
+  business_name?: string;
+  businessName?: string;
   owner_name?: string;
   email?: string;
   phone?: string;
@@ -139,7 +141,8 @@ const AdminVendors = () => {
   const suspendedCount = vendors.filter(v => !v.active).length;
 
   const filteredVendors = vendors.filter(v => {
-    const matchesSearch = v.name.toLowerCase().includes(search.toLowerCase()) || 
+    const vendorName = v.business_name || v.businessName || v.name || 'Unknown Vendor';
+    const matchesSearch = vendorName.toLowerCase().includes(search.toLowerCase()) || 
                           (v.owner_name && v.owner_name.toLowerCase().includes(search.toLowerCase()));
     
     if (filter === 'verified') return matchesSearch && v.verified;
@@ -228,19 +231,21 @@ const AdminVendors = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
-                {filteredVendors.map((vendor) => (
-                  <tr key={vendor.id} className="hover:bg-gray-50/50 transition-colors group">
-                    <td className="px-8 py-6">
-                      <div className="flex items-center">
-                        <div className="h-12 w-12 rounded-2xl bg-gray-100 flex items-center justify-center mr-4 text-sm font-bold text-gray-500 border border-gray-50 shadow-inner">
-                          {vendor.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
+                {filteredVendors.map((vendor) => {
+                  const vendorName = vendor.business_name || vendor.businessName || vendor.name || 'Unknown Vendor';
+                  return (
+                    <tr key={vendor.id} className="hover:bg-gray-50/50 transition-colors group">
+                      <td className="px-8 py-6">
+                        <div className="flex items-center">
+                          <div className="h-12 w-12 rounded-2xl bg-gray-100 flex items-center justify-center mr-4 text-sm font-bold text-gray-500 border border-gray-50 shadow-inner">
+                            {vendorName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
+                          </div>
+                          <div>
+                            <p className="text-sm font-bold text-gray-900">{vendorName}</p>
+                            <p className="text-xs text-gray-400 font-mono mt-0.5">ID: {vendor.id}</p>
+                          </div>
                         </div>
-                        <div>
-                          <p className="text-sm font-bold text-gray-900">{vendor.name}</p>
-                          <p className="text-xs text-gray-400 font-mono mt-0.5">ID: {vendor.id}</p>
-                        </div>
-                      </div>
-                    </td>
+                      </td>
                     <td className="px-8 py-6">
                       <p className="text-sm font-bold text-gray-900">{vendor.owner_name || 'N/A'}</p>
                       <p className="text-xs text-gray-500 mt-0.5">{vendor.email || '-'}</p>
@@ -304,7 +309,8 @@ const AdminVendors = () => {
                       </div>
                     </td>
                   </tr>
-                ))}
+                );
+              })}
               </tbody>
             </table>
           </div>

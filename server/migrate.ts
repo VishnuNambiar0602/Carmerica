@@ -2,6 +2,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import pg from 'pg';
+import dotenv from 'dotenv';
+
+dotenv.config({ path: '.env.local', override: false });
+dotenv.config();
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 

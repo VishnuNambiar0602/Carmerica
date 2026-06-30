@@ -166,6 +166,189 @@ const decorateBooking = async (booking: any) => {
 
 // --- Health & Hello ---
 router.get('/hello', (_req, res) => res.json({ message: 'Hello from the API!' }));
+router.get('/temp-seed-database', async (_req, res) => {
+  try {
+    const databaseUrl = process.env.DATABASE_URL;
+    if (!databaseUrl) {
+      return res.status(400).json({ error: 'DATABASE_URL environment variable is missing.' });
+    }
+
+    const { Pool } = await import('pg');
+    const pool = new Pool({ connectionString: databaseUrl, ssl: { rejectUnauthorized: false } });
+
+    const fs = await import('node:fs');
+    const path = await import('node:path');
+    const { fileURLToPath } = await import('node:url');
+    const currentDir = path.dirname(fileURLToPath(import.meta.url));
+    
+    const schemaPath = path.join(currentDir, 'schema.sql');
+    if (!fs.existsSync(schemaPath)) {
+      return res.status(500).json({ error: `schema.sql not found at ${schemaPath}` });
+    }
+    const schema = fs.readFileSync(schemaPath, 'utf-8');
+    await pool.query(schema);
+
+    const dummyPath = path.join(currentDir, 'lib', 'dummy-data.json');
+    if (!fs.existsSync(dummyPath)) {
+      return res.status(500).json({ error: `dummy-data.json not found at ${dummyPath}` });
+    }
+    const dummy = JSON.parse(fs.readFileSync(dummyPath, 'utf-8'));
+
+    const tableSchemaMap: Record<string, string[]> = {
+      users: ['id', 'email', 'password_hash', 'role', 'full_name', 'phone', 'status', 'metadata', 'created_at', 'updated_at', 'email_verified_at'],
+      vendors: ['id', 'user_id', 'business_name', 'email', 'phone', 'location', 'description', 'rating', 'verified', 'active', 'metadata', 'created_at', 'updated_at'],
+      garages: ['id', 'vendor_id', 'name', 'location', 'city', 'rating', 'reviews', 'active', 'metadata', 'created_at', 'updated_at', 'lat', 'lng', 'opening_hours', 'phone', 'images'],
+      categories: ['id', 'name', 'slug', 'description', 'active', 'metadata', 'created_at', 'updated_at'],
+      services: ['id', 'vendor_id', 'garage_id', 'category_id', 'name', 'description', 'price', 'duration_minutes', 'active', 'metadata', 'created_at', 'updated_at'],
+      bookings: ['id', 'customer_id', 'vendor_id', 'garage_id', 'service_id', 'customer_email', 'customer_name', 'vehicle', 'scheduled_date', 'scheduled_time', 'status', 'amount', 'cancellation_reason', 'metadata', 'created_at', 'updated_at'],
+      payments: ['id', 'booking_id', 'amount', 'currency', 'status', 'provider', 'provider_payment_id', 'refund_amount', 'stripe_payment_intent_id', 'stripe_charge_id', 'metadata', 'created_at', 'updated_at'],
+      reviews: ['id', 'booking_id', 'customer_id', 'vendor_id', 'garage_id', 'rating', 'comment', 'status', 'vendor_response', 'metadata', 'created_at', 'updated_at'],
+      promotions: ['id', 'vendor_id', 'title', 'description', 'discount_type', 'discount_value', 'starts_at', 'ends_at', 'status', 'metadata', 'created_at', 'updated_at', 'promo_code', 'usage_limit', 'used_count'],
+      staff: ['id', 'vendor_id', 'name', 'role', 'email', 'phone', 'active', 'metadata', 'created_at', 'updated_at'],
+      messages: ['id', 'thread_id', 'sender_role', 'sender_id', 'recipient_id', 'body', 'metadata', 'created_at'],
+      notifications: ['id', 'user_id', 'type', 'title', 'body', 'channel', 'is_read', 'metadata', 'created_at', 'read_at'],
+      kyv_documents: ['id', 'vendor_id', 'document_type', 'file_name', 'file_url', 'file_hash', 'file_size', 'mime_type', 'status', 'reviewed_by', 'reviewed_at', 'review_note', 'metadata', 'created_at', 'updated_at'],
+      wishlist: ['id', 'customer_email', 'garage_id', 'created_at'],
+      support_tickets: ['id', 'user_id', 'subject', 'message', 'status', 'priority', 'assigned_to', 'metadata', 'created_at', 'updated_at'],
+      vehicles: ['id', 'user_id', 'make', 'model', 'year', 'vin', 'mileage', 'color', 'fuel_type', 'last_service_date', 'last_service_type', 'status', 'metadata', 'created_at', 'updated_at']
+    };
+
+    const snakePattern = /[A-Z]/g;
+    const toSnake = (val: string) => val.replace(snakePattern, (letter) => `_${letter.toLowerCase()}`);
+
+    const prepareRowForDb = (input: Record<string, any>, allowed: string[]) => {
+      const row: Record<string, any> = {};
+      const metadata: Record<string, any> = {};
+      const allowedSet = new Set(allowed);
+
+      for (const [key, value] of Object.entries(input)) {
+        if (value === undefined) continue;
+        const snake = toSnake(key);
+        if (allowedSet.has(snake)) {
+          row[snake] = value;
+        } else if (!['id', 'created_at', 'updated_at', 'createdAt', 'updatedAt'].includes(key)) {
+          metadata[key] = value;
+        }
+      }
+
+      if (input.id && allowedSet.has('id')) row.id = input.id;
+      if (input.created_at && allowedSet.has('created_at')) row.created_at = input.created_at;
+      else if (input.createdAt && allowedSet.has('created_at')) row.created_at = input.createdAt;
+      if (input.updated_at && allowedSet.has('updated_at')) row.updated_at = input.updated_at;
+      else if (input.updatedAt && allowedSet.has('updated_at')) row.updated_at = input.updatedAt;
+
+      if (allowedSet.has('metadata')) {
+        row.metadata = {
+          ...(input.metadata || {}),
+          ...metadata
+        };
+      }
+
+      return row;
+    };
+
+    const insertRows = async (tableName: string, rows: any[]) => {
+      if (!rows || !rows.length) return;
+      await pool.query(`TRUNCATE TABLE ${tableName} CASCADE`);
+      
+      const allowedColumns = tableSchemaMap[tableName] || [];
+      const preparedRows = rows.map(r => prepareRowForDb(r, allowedColumns));
+      
+      const columns = allowedColumns.filter(col => preparedRows.some(row => row[col] !== undefined));
+      if (!columns.length) return;
+
+      const batchSize = 100;
+      for (let i = 0; i < preparedRows.length; i += batchSize) {
+        const batch = preparedRows.slice(i, i + batchSize);
+        const values: any[] = [];
+        const valueStrings: string[] = [];
+        
+        batch.forEach((row, rowIndex) => {
+          const rowValues = columns.map(col => {
+            const v = row[col];
+            if (v === undefined) return null;
+            if (v && Array.isArray(v)) {
+              return v;
+            }
+            if (v && typeof v === 'object') {
+              return JSON.stringify(v);
+            }
+            return v;
+          });
+          
+          const placeholders = rowValues.map((_, colIndex) => {
+            const index = rowIndex * columns.length + colIndex + 1;
+            return `$${index}`;
+          });
+          
+          values.push(...rowValues);
+          valueStrings.push(`(${placeholders.join(', ')})`);
+        });
+        
+        const queryStr = `INSERT INTO ${tableName} (${columns.join(', ')}) VALUES ${valueStrings.join(', ')}`;
+        await pool.query(queryStr, values);
+      }
+    };
+
+    const nowStr = new Date().toISOString();
+    const categories = [
+      { id: 'cat-1', name: 'Maintenance', slug: 'maintenance', active: true, created_at: nowStr, updated_at: nowStr },
+      { id: 'cat-2', name: 'Repairs', slug: 'repairs', active: true, created_at: nowStr, updated_at: nowStr },
+      { id: 'cat-3', name: 'Diagnostics', slug: 'diagnostics', active: true, created_at: nowStr, updated_at: nowStr },
+      { id: 'cat-4', name: 'Electrical', slug: 'electrical', active: true, created_at: nowStr, updated_at: nowStr }
+    ];
+    await insertRows('categories', categories);
+
+    const adminHash = await bcrypt.hash('admin123', 10);
+    const defaultAdmin = {
+      id: 'user-admin',
+      email: 'admin@carmerica.com',
+      password_hash: adminHash,
+      role: 'admin',
+      full_name: 'System Admin',
+      status: 'active',
+      created_at: nowStr,
+      updated_at: nowStr,
+      email_verified_at: nowStr
+    };
+    const allUsers = [...(dummy.users || [])];
+    if (!allUsers.some((u: any) => u.email === 'admin@carmerica.com')) {
+      allUsers.push(defaultAdmin);
+    }
+    await insertRows('users', allUsers);
+    await insertRows('vendors', dummy.vendors);
+    await insertRows('garages', dummy.garages);
+    await insertRows('services', dummy.services);
+    await insertRows('vehicles', dummy.vehicles);
+    await insertRows('bookings', dummy.bookings);
+    await insertRows('reviews', dummy.reviews);
+
+    await pool.end();
+
+    return res.json({
+      status: 'success',
+      message: 'Database schema migration run and dummy data successfully seeded!',
+      summary: {
+        users: dummy.users?.length || 0,
+        vendors: dummy.vendors?.length || 0,
+        garages: dummy.garages?.length || 0,
+        services: dummy.services?.length || 0,
+        vehicles: dummy.vehicles?.length || 0,
+        bookings: dummy.bookings?.length || 0,
+        reviews: dummy.reviews?.length || 0,
+      }
+    });
+  } catch (error: any) {
+    console.error('Seed error:', error);
+    return res.status(500).json({
+      status: 'error',
+      message: 'Failed to seed database',
+      error: error.message,
+      stack: error.stack
+    });
+  }
+});
+
 router.get('/health', (_req, res) => {
   res.json({
     status: 'ok',

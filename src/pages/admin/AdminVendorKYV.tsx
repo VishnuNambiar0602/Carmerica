@@ -33,6 +33,8 @@ import { cn } from '../../lib/utils';
 interface VendorRecord {
   id: string;
   name: string;
+  business_name?: string;
+  businessName?: string;
   owner_name?: string;
   email?: string;
   phone?: string;
@@ -257,7 +259,7 @@ const AdminVendorKYV = () => {
           </button>
           <div>
             <div className="flex items-center gap-3">
-              <h1 className="text-3xl font-bold text-gray-900 tracking-tight">{vendor.name}</h1>
+              <h1 className="text-3xl font-bold text-gray-900 tracking-tight">{vendor.business_name || vendor.businessName || vendor.name}</h1>
               <span className={cn(
                 "px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider",
                 vendor.verified ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"
@@ -356,7 +358,7 @@ const AdminVendorKYV = () => {
               <div className="space-y-4">
                 <div>
                   <label className="text-xs font-bold text-gray-400 uppercase tracking-widest">Legal Name</label>
-                  <p className="text-gray-950 font-bold mt-0.5">{vendor.name}</p>
+                  <p className="text-gray-955 font-bold mt-0.5">{vendor.business_name || vendor.businessName || vendor.name}</p>
                 </div>
                 <div>
                   <label className="text-xs font-bold text-gray-400 uppercase tracking-widest">Business Owner Name</label>

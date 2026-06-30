@@ -42,7 +42,7 @@ export function VendorProtectedRoute({ children }: { children: React.ReactNode }
       return <Navigate to={`/vendor/login?redirect=${encodeURIComponent(location.pathname + location.search)}`} replace />;
     }
     if (payload.role !== 'vendor' && payload.role !== 'admin') {
-      return <Navigate to="/" replace />;
+      return <Navigate to={`/vendor/login?redirect=${encodeURIComponent(location.pathname + location.search)}`} replace />;
     }
   } catch {
     localStorage.removeItem('token');
@@ -64,7 +64,7 @@ export function AdminProtectedRoute({ children }: { children: React.ReactNode })
       return <Navigate to={`/admin/login?redirect=${encodeURIComponent(location.pathname + location.search)}`} replace />;
     }
     if (payload.role !== 'admin') {
-      return <Navigate to="/" replace />;
+      return <Navigate to={`/admin/login?redirect=${encodeURIComponent(location.pathname + location.search)}`} replace />;
     }
   } catch {
     localStorage.removeItem('token');
